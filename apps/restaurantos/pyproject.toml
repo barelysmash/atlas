@@ -1,0 +1,8 @@
+[project]
+name = "restaurantos"
+version = "0.3.0-alpha.1"
+description = "RestaurantOS application built on Atlas."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
