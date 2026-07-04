@@ -1,4 +1,5 @@
 import csv
+from atlas_core import OperationalRecord
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,3 +47,59 @@ def import_tabc_csv(path: str | Path) -> list[TABCRecord]:
             )
 
     return records
+
+def normalize_tabc_records(
+    records: list[TABCRecord],
+) -> list[OperationalRecord]:
+    """Convert TABC records into canonical Atlas OperationalRecords."""
+
+    normalized: list[OperationalRecord] = []
+
+    for record in records:
+        dimensions = {
+            "permit_number": record.permit_number,
+            "city": record.city,
+        }
+
+        normalized.extend(
+            [
+                OperationalRecord.create(
+                    source="tabc",
+                    entity=record.location_name,
+                    period=record.report_month,
+                    category="alcohol",
+                    metric="liquor_receipts",
+                    value=record.liquor_receipts,
+                    dimensions=dimensions,
+                ),
+                OperationalRecord.create(
+                    source="tabc",
+                    entity=record.location_name,
+                    period=record.report_month,
+                    category="alcohol",
+                    metric="wine_receipts",
+                    value=record.wine_receipts,
+                    dimensions=dimensions,
+                ),
+                OperationalRecord.create(
+                    source="tabc",
+                    entity=record.location_name,
+                    period=record.report_month,
+                    category="alcohol",
+                    metric="beer_receipts",
+                    value=record.beer_receipts,
+                    dimensions=dimensions,
+                ),
+                OperationalRecord.create(
+                    source="tabc",
+                    entity=record.location_name,
+                    period=record.report_month,
+                    category="sales",
+                    metric="total_receipts",
+                    value=record.total_receipts,
+                    dimensions=dimensions,
+                ),
+            ]
+        )
+
+    return normalized

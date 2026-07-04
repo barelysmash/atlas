@@ -5,4 +5,7 @@ description = "RestaurantOS application built on Atlas."
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [
+    "src",
+    "../../packages/atlas-core/src"
+]

@@ -46,3 +46,37 @@ def test_import_tabc_csv(tmp_path: Path):
     assert record.wine_receipts == 50000.0
     assert record.beer_receipts == 25000.0
     assert record.total_receipts == 175000.0
+
+from restaurantos.tabc_importer import TABCRecord, normalize_tabc_records
+
+def test_normalize_tabc_records():
+    records = [
+        TABCRecord(
+            taxpayer_name="Fonda San Miguel",
+            permit_number="MB091654",
+            location_name="Fonda San Miguel",
+            city="Austin",
+            report_month="2026-06",
+            liquor_receipts=100000,
+            wine_receipts=50000,
+            beer_receipts=25000,
+            total_receipts=175000,
+        )
+    ]
+
+    normalized = normalize_tabc_records(records)
+
+    assert len(normalized) == 4
+    assert normalized[0].source == "tabc"
+    assert normalized[0].entity == "Fonda San Miguel"
+    assert normalized[0].period == "2026-06"
+    assert normalized[0].dimensions["permit_number"] == "MB091654"
+
+    metrics = [record.metric for record in normalized]
+
+    assert metrics == [
+        "liquor_receipts",
+        "wine_receipts",
+        "beer_receipts",
+        "total_receipts",
+    ]
