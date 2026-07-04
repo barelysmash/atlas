@@ -4,6 +4,7 @@ from restaurantos.tabc_importer import (
     import_tabc_csv,
     normalize_tabc_records,
 )
+from restaurantos.cli import morning_brief
 
 __all__ = [
     "RestaurantRecord",
@@ -11,4 +12,6 @@ __all__ = [
     "TABCRecord",
     "import_tabc_csv",
     "normalize_tabc_records",
+    "OperationalRecord",
+    "morning_brief",
 ]
