@@ -3,7 +3,8 @@ from atlas_core.observation_engine import generate_observations
 from atlas_core.observation import Observation
 from atlas_core.insight_engine import generate_insights
 from atlas_core.insight import Insight
+from atlas_core.reasoning_pipeline import ReasoningPipeline
 from atlas_core.decision_engine import generate_decisions
 from atlas_core.decision import Decision
 
-__all__ = ["OperationalRecord", "generate_observations", "Observation", "generate_insights", "Insight", "generate_decisions", "Decision"]
+__all__ = ["OperationalRecord", "generate_observations", "Observation", "generate_insights", "Insight", "ReasoningPipeline", "generate_decisions", "Decision"]
