@@ -18,3 +18,6 @@ __pycache__/
 
 # Private operational data
 datasets/private/**
+# One-off scripts handed over for a single change
+apply-*.sh
+repair-*.sh
