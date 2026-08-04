@@ -1,14 +1,17 @@
-from atlas_core.observation import Observation
+from datetime import datetime, timezone
+
+from atlas_core import Metric, Observation
 
 CROCKFORD = set("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def _observation() -> Observation:
     return Observation(
-        category="revenue",
-        metric="weekly_total",
-        value=48210.0,
+        domain="revenue",
         summary="Weekly revenue was 48210.",
+        metrics=(Metric(name="weekly_total", value=48210.0, unit="usd"),),
+        observed_at=OBSERVED_AT,
     )
 
 
@@ -36,10 +39,10 @@ def test_equality_ignores_identity() -> None:
 
 def test_identifier_can_be_supplied() -> None:
     pinned = Observation(
-        category="revenue",
-        metric="weekly_total",
-        value=48210.0,
+        domain="revenue",
         summary="Weekly revenue was 48210.",
+        metrics=(Metric(name="weekly_total", value=48210.0),),
+        observed_at=OBSERVED_AT,
         observation_id="obs_01JQZX3T8KMNPQRSTVWXYZ0123",
     )
     assert pinned.observation_id == "obs_01JQZX3T8KMNPQRSTVWXYZ0123"

@@ -19,13 +19,9 @@ class ExecutiveBrief:
             f"- {observation.summary}" for observation in result.observations
         )
 
-        insights = "\n".join(
-            f"- {insight.summary}" for insight in result.insights
-        )
+        insights = "\n".join(f"- {insight.summary}" for insight in result.insights)
 
-        decisions = "\n".join(
-            f"- {decision.summary}" for decision in result.decisions
-        )
+        decisions = "\n".join(f"- {decision.summary}" for decision in result.decisions)
 
         markdown = (
             f"# {title}\n\n"
