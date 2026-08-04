@@ -15,6 +15,7 @@ jobs:
     strategy:
       matrix:
         package:
+          - atlas-core
           - atlas-events
           - atlas-metrics
           - atlas-memory
