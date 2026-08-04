@@ -13,9 +13,7 @@ def generate_decisions(insights: list[Insight]) -> list[Decision]:
                 Decision(
                     summary="Continue promoting premium wine.",
                     confidence=0.80,
-                    recommendations=[
-                        "Continue premium wine sampling."
-                    ],
+                    recommendations=["Continue premium wine sampling."],
                     insights=[insight],
                 )
             )

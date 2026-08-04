@@ -8,7 +8,7 @@ def generate_insights(observations: list[Observation]) -> list[Insight]:
     insights: list[Insight] = []
 
     for observation in observations:
-        if observation.metric == "wine_receipts":
+        if observation.has_metric("wine_receipts"):
             insights.append(
                 Insight(
                     summary="Wine remains an active revenue contributor.",

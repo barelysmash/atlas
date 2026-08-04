@@ -1,13 +1,18 @@
-from atlas_core import Decision, Insight, Observation
+from datetime import datetime, timezone
+
+from atlas_core import Decision, Insight, Metric, Observation
+
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def test_create_decision_from_insights():
     observation = Observation(
-        category="operations",
-        metric="wine_receipts",
-        value=50000.0,
+        domain="operations",
+        subject="Fonda San Miguel",
         summary="Wine receipts were $50,000.",
-        evidence=["TABC June 2026"],
+        metrics=(Metric(name="wine_receipts", value=50000.0),),
+        source_ref="TABC June 2026",
+        observed_at=OBSERVED_AT,
     )
 
     insight = Insight(
