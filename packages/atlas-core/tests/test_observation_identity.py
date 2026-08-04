@@ -13,11 +13,17 @@ def _observation() -> Observation:
 
 
 def test_observation_is_identified_on_construction() -> None:
-    assert len(_observation().observation_id) == 26
+    assert len(_observation().observation_id) == 30
+
+
+def test_identifier_carries_the_contract_prefix() -> None:
+    assert _observation().observation_id.startswith("obs_")
 
 
 def test_identifier_is_schema_valid() -> None:
-    assert set(_observation().observation_id) <= CROCKFORD
+    _, _, ulid = _observation().observation_id.partition("_")
+    assert len(ulid) == 26
+    assert set(ulid) <= CROCKFORD
 
 
 def test_identifiers_are_distinct() -> None:
@@ -34,6 +40,6 @@ def test_identifier_can_be_supplied() -> None:
         metric="weekly_total",
         value=48210.0,
         summary="Weekly revenue was 48210.",
-        observation_id="01JQZX3T8KMNPQRSTVWXYZ0123",
+        observation_id="obs_01JQZX3T8KMNPQRSTVWXYZ0123",
     )
-    assert pinned.observation_id == "01JQZX3T8KMNPQRSTVWXYZ0123"
+    assert pinned.observation_id == "obs_01JQZX3T8KMNPQRSTVWXYZ0123"

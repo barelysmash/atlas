@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from atlas_core.identifiers import new_ulid
+from atlas_core.identifiers import new_observation_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,4 +21,4 @@ class Observation:
     value: float | str
     summary: str
     evidence: list[str] = field(default_factory=list)
-    observation_id: str = field(default_factory=new_ulid, compare=False)
+    observation_id: str = field(default_factory=new_observation_id, compare=False)
