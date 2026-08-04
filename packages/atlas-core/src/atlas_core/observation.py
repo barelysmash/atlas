@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from atlas_core.identifiers import new_ulid
+
 
 @dataclass(frozen=True, slots=True)
 class Observation:
@@ -7,6 +9,11 @@ class Observation:
 
     Observations describe what happened.
     They do not interpret why it happened.
+
+    ``observation_id`` is excluded from equality. Two observations of the
+    same fact remain equal by content, which keeps deduplication working,
+    while each still carries the identity that Insights and Decisions cite
+    as evidence.
     """
 
     category: str
@@ -14,3 +21,4 @@ class Observation:
     value: float | str
     summary: str
     evidence: list[str] = field(default_factory=list)
+    observation_id: str = field(default_factory=new_ulid, compare=False)
