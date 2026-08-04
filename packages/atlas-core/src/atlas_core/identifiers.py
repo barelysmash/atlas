@@ -19,7 +19,21 @@ _TIMESTAMP_BITS = 48
 _RANDOM_BITS = 80
 _ENCODED_LENGTH = 26
 
-__all__ = ["new_ulid"]
+# The prefix each contract requires ahead of the ULID. JAM's schemas match
+# on these, so an unprefixed identifier is rejected at the emission boundary.
+PREFIXES = {
+    "observation": "obs",
+    "insight": "ins",
+    "decision": "dec",
+}
+
+__all__ = [
+    "PREFIXES",
+    "new_decision_id",
+    "new_insight_id",
+    "new_observation_id",
+    "new_ulid",
+]
 
 
 def new_ulid(now: datetime | None = None) -> str:
@@ -44,3 +58,23 @@ def new_ulid(now: datetime | None = None) -> str:
         characters.append(_ALPHABET[value & 0x1F])
         value >>= 5
     return "".join(reversed(characters))
+
+
+def _prefixed(kind: str, now: datetime | None = None) -> str:
+    """Return a contract identifier: the kind's prefix, then a ULID."""
+    return f"{PREFIXES[kind]}_{new_ulid(now)}"
+
+
+def new_observation_id(now: datetime | None = None) -> str:
+    """Identifier for an Observation, as observation.schema.json requires."""
+    return _prefixed("observation", now)
+
+
+def new_insight_id(now: datetime | None = None) -> str:
+    """Identifier for an Insight, as insight.schema.json requires."""
+    return _prefixed("insight", now)
+
+
+def new_decision_id(now: datetime | None = None) -> str:
+    """Identifier for a Decision, as decision.schema.json requires."""
+    return _prefixed("decision", now)
