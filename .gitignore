@@ -22,3 +22,8 @@ datasets/private/**
 apply-*.sh
 repair-*.sh
 fix-*.sh
+
+# Test and build artifacts
+.coverage
+.pytest_cache/
+*.egg-info/

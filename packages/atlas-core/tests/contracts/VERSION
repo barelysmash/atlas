@@ -1,0 +1,10 @@
+# Vendored JAM contract schemas.
+# Refreshing is deliberate: bump the release, copy the schemas, run the
+# contract test, and commit the schemas and this note together.
+
+jam v1.3.0
+observation 1.0.0
+insight 1.0.0
+decision 1.1.0
+
+# decision-state is not vendored: Atlas emits no DecisionState.
