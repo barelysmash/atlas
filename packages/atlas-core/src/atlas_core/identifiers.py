@@ -25,6 +25,7 @@ PREFIXES = {
     "observation": "obs",
     "insight": "ins",
     "decision": "dec",
+    "recommendation": "rec",
 }
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "new_decision_id",
     "new_insight_id",
     "new_observation_id",
+    "new_recommendation_id",
     "new_ulid",
 ]
 
@@ -78,3 +80,8 @@ def new_insight_id(now: datetime | None = None) -> str:
 def new_decision_id(now: datetime | None = None) -> str:
     """Identifier for a Decision, as decision.schema.json requires."""
     return _prefixed("decision", now)
+
+
+def new_recommendation_id(now: datetime | None = None) -> str:
+    """Identifier for a Recommendation, as the Decision schema requires."""
+    return _prefixed("recommendation", now)
