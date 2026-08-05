@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from atlas_core import Insight, Metric, Observation
+from atlas_core import EvidenceItem, Insight, Metric, Observation
 from atlas_core.decision_engine import generate_decisions
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
 
 
 def _observation(metric_name: str, value: float) -> Observation:
@@ -17,11 +18,21 @@ def _observation(metric_name: str, value: float) -> Observation:
     )
 
 
+def _insight(statement: str, confidence: float, metric_name: str) -> Insight:
+    return Insight(
+        domain="sales",
+        statement=statement,
+        confidence=confidence,
+        evidence=(
+            EvidenceItem.citing(_observation(metric_name, 50000.0), metric_name),
+        ),
+        created_at=CREATED_AT,
+    )
+
+
 def test_generate_decisions_from_wine_insight():
-    insight = Insight(
-        summary="Wine remains an active revenue contributor.",
-        confidence=0.80,
-        observations=[_observation("wine_receipts", 50000.0)],
+    insight = _insight(
+        "Wine remains an active revenue contributor.", 0.80, "wine_receipts"
     )
 
     decisions = generate_decisions([insight])
@@ -34,10 +45,5 @@ def test_generate_decisions_from_wine_insight():
 
 
 def test_generate_decisions_ignores_unknown_insights():
-    insight = Insight(
-        summary="Beer receipts were recorded.",
-        confidence=0.50,
-        observations=[_observation("beer_receipts", 25000.0)],
-    )
-
+    insight = _insight("Beer receipts were recorded.", 0.50, "beer_receipts")
     assert generate_decisions([insight]) == []

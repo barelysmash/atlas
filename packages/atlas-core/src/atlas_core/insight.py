@@ -1,15 +1,37 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 
-from atlas_core.observation import Observation
+from atlas_core.evidence_item import EvidenceItem
+from atlas_core.identifiers import new_insight_id
 
 
 @dataclass(frozen=True, slots=True)
 class Insight:
-    """An interpretation supported by observations.
+    """An interpretation connecting Observations to a Decision.
 
-    Insights explain what observations likely mean.
+    Insights explain what observations likely mean. An Insight can be wrong
+    while every Observation behind it is right, which is why it is recorded
+    separately.
+
+    ``statement`` is declarative, never imperative: a Decision instructs, an
+    Insight interprets. An Insight that reads as an instruction has skipped a
+    step.
+
+    An Insight has no category. Categories classify recommended action, and an
+    Insight recommends nothing.
+
+    Unlike a Decision, confidence has no emission floor. A tentative
+    interpretation is worth recording; a tentative recommendation is not.
     """
 
-    summary: str
+    domain: str
+    statement: str
     confidence: float
-    observations: list[Observation] = field(default_factory=list)
+    evidence: tuple[EvidenceItem, ...]
+    created_at: datetime
+    method: str | None = None
+    insight_id: str = field(default_factory=new_insight_id, compare=False)
+
+    def cites(self, observation_id: str) -> bool:
+        """Whether this interpretation rests on that Observation."""
+        return any(item.observation_id == observation_id for item in self.evidence)

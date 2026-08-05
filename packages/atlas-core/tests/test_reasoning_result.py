@@ -1,8 +1,16 @@
 from datetime import datetime, timezone
 
-from atlas_core import Decision, Insight, Metric, Observation, ReasoningResult
+from atlas_core import (
+    Decision,
+    EvidenceItem,
+    Insight,
+    Metric,
+    Observation,
+    ReasoningResult,
+)
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
 
 
 def test_create_reasoning_result():
@@ -16,9 +24,11 @@ def test_create_reasoning_result():
     )
 
     insight = Insight(
-        summary="Wine remains an active revenue contributor.",
+        domain="sales",
+        statement="Wine remains an active revenue contributor.",
         confidence=0.80,
-        observations=[observation],
+        evidence=(EvidenceItem.citing(observation, "wine_receipts"),),
+        created_at=CREATED_AT,
     )
 
     decision = Decision(
