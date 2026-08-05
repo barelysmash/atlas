@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from atlas_core import Metric, Observation
 from atlas_core.insight_engine import generate_insights
 
-OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
-NOW = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+NOW = datetime(2026, 7, 1, 14, 0, tzinfo=UTC)
 
 
 def _observation(metric_name: str, value: float) -> Observation:

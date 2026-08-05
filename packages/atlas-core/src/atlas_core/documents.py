@@ -13,7 +13,7 @@ treat null as a value.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from atlas_core.decision import Decision
@@ -68,7 +68,7 @@ def _timestamp(moment: datetime) -> str:
     """
     if moment.tzinfo is None:
         raise ValueError("timestamps must be timezone-aware")
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _prune(document: dict[str, Any]) -> dict[str, Any]:

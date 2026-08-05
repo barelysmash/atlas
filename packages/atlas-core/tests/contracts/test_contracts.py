@@ -9,7 +9,7 @@ See standards/testing.md in JAM.
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from atlas_core import OperationalRecord
@@ -22,7 +22,7 @@ from atlas_core.documents import (
 from atlas_core.reasoning_pipeline import ReasoningPipeline
 
 BUILD = "0.4.1"
-RUN_AT = datetime(2026, 7, 1, 15, 0, tzinfo=timezone.utc)
+RUN_AT = datetime(2026, 7, 1, 15, 0, tzinfo=UTC)
 
 RECORDS = [
     ("tabc", "Fonda San Miguel", "2026-06", "sales", "wine_receipts", 50000.0),

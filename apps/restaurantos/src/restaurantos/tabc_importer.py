@@ -1,7 +1,8 @@
 import csv
-from atlas_core import OperationalRecord
 from dataclasses import dataclass
 from pathlib import Path
+
+from atlas_core import OperationalRecord
 
 
 @dataclass(frozen=True)

@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from atlas_core import EvidenceItem, Insight, Metric, Observation
 from atlas_core.decision import CONFIDENCE_FLOOR
 from atlas_core.decision_engine import generate_decisions
 
-OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
-CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
-NOW = datetime(2026, 7, 1, 15, 0, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=UTC)
+NOW = datetime(2026, 7, 1, 15, 0, tzinfo=UTC)
 
 WINE_INSIGHT = "Wine remains an active revenue contributor."
 

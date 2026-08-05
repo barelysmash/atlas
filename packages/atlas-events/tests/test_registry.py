@@ -1,5 +1,4 @@
 import pytest
-
 from atlas_events import EventRegistry
 
 
