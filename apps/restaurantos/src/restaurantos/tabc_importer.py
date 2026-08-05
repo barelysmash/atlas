@@ -49,6 +49,7 @@ def import_tabc_csv(path: str | Path) -> list[TABCRecord]:
 
     return records
 
+
 def normalize_tabc_records(
     records: list[TABCRecord],
 ) -> list[OperationalRecord]:

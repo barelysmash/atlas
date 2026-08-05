@@ -81,7 +81,9 @@ def test_emitted_documents_satisfy_the_contract(kind, emitted, validators):
     documents = emitted[kind]
     assert documents, f"the pipeline emitted no {kind} to validate"
     for document in documents:
-        errors = sorted(validators[kind].iter_errors(document), key=lambda e: list(e.path))
+        errors = sorted(
+            validators[kind].iter_errors(document), key=lambda e: list(e.path)
+        )
         assert not errors, _describe(kind, document, errors)
 
 
