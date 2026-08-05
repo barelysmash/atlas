@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from restaurantos.tabc_importer import import_tabc_csv
+from restaurantos.tabc_importer import (
+    TABCRecord,
+    import_tabc_csv,
+    normalize_tabc_records,
+)
 
 
 def test_import_tabc_csv(tmp_path: Path):
