@@ -36,7 +36,7 @@ jobs:
       - name: Install pytest
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest pytest-cov jsonschema
           pip install -e ../atlas-core -e ../atlas-events -e ../atlas-memory -e ../atlas-metrics
 
       - name: Run tests
