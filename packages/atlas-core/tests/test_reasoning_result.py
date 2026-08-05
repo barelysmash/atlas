@@ -7,6 +7,7 @@ from atlas_core import (
     Metric,
     Observation,
     ReasoningResult,
+    Recommendation,
 )
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
@@ -32,10 +33,15 @@ def test_create_reasoning_result():
     )
 
     decision = Decision(
-        summary="Continue promoting premium wine.",
+        domain="sales",
+        category="atlas.marketing",
+        priority="low",
         confidence=0.80,
-        recommendations=["Continue premium wine sampling."],
-        insights=[insight],
+        summary="Continue promoting premium wine.",
+        evidence=insight.evidence,
+        derived_from=(insight.insight_id,),
+        recommendations=(Recommendation(statement="Continue premium wine sampling."),),
+        created_at=CREATED_AT,
     )
 
     result = ReasoningResult(
