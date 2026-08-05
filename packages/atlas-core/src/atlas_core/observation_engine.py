@@ -1,3 +1,4 @@
+from atlas_core.grain import GRAIN_PERIODS
 from atlas_core.metric import Metric
 from atlas_core.observation import Observation
 from atlas_core.operational_record import OperationalRecord
@@ -22,7 +23,13 @@ def generate_observations(record: OperationalRecord) -> list[Observation]:
             domain=record.category,
             subject=record.entity,
             summary=f"{record.metric} was {record.value:,.0f}.",
-            metrics=(Metric(name=record.metric, value=record.value),),
+            metrics=(
+                Metric(
+                    name=record.metric,
+                    value=record.value,
+                    period=GRAIN_PERIODS[record.grain],
+                ),
+            ),
             source_ref=f"{record.source}:{record.entity}:{record.period}",
             observed_at=record.timestamp,
         )
