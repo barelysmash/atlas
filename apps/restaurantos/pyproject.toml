@@ -9,3 +9,5 @@ pythonpath = [
     "src",
     "../../packages/atlas-core/src"
 ]
+addopts = "-m 'not integration' --cov=src/restaurantos --cov-report=term-missing --cov-fail-under=70"
+markers = ["integration: touches the network or a live service"]
