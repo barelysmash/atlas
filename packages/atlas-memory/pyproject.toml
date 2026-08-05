@@ -7,6 +7,7 @@ name = "barelysmash-atlas-memory"
 version = "0.2.0-alpha.1"
 description = "Organizational memory engine for Atlas."
 requires-python = ">=3.11"
+dependencies = ["barelysmash-atlas-core"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "../atlas-core/src"]
