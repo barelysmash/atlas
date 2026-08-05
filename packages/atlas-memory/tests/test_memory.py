@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from atlas_core import Metric, Observation
-from atlas_memory import Decision, Experiment, MemoryStore, PlaybookEntry
+from atlas_memory import DecisionRecord, Experiment, MemoryStore, PlaybookEntry
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
@@ -52,12 +52,12 @@ def test_create_experiment():
     assert experiment.hypothesis
 
 
-def test_create_decision():
-    decision = Decision.create(
+def test_create_decision_record():
+    record = DecisionRecord.create(
         "Adopt wine sampling",
         "Wine attachment increased during the test.",
     )
-    assert decision.summary == "Adopt wine sampling"
+    assert record.summary == "Adopt wine sampling"
 
 
 def test_create_playbook_entry():
