@@ -1,7 +1,8 @@
 import csv
-from atlas_core import OperationalRecord
 from dataclasses import dataclass
 from pathlib import Path
+
+from atlas_core import OperationalRecord
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ def import_tabc_csv(path: str | Path) -> list[TABCRecord]:
             )
 
     return records
+
 
 def normalize_tabc_records(
     records: list[TABCRecord],

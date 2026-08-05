@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from atlas_core import EvidenceItem, Insight, Metric, Observation
 
-OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
-CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=UTC)
 
 
 def _observation() -> Observation:

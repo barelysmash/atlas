@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from atlas_core import (
@@ -17,8 +17,8 @@ from atlas_core.documents import (
     observation_document,
 )
 
-OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
-CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=UTC)
 BUILD = "0.4.1"
 
 
@@ -148,7 +148,7 @@ def test_a_naive_timestamp_is_refused():
         domain="beverage",
         summary="Something was measured.",
         metrics=(Metric(name="units_sold", value=1),),
-        observed_at=datetime(2026, 7, 1, 12, 0),  # noqa: DTZ001 - the point
+        observed_at=datetime(2026, 7, 1, 12, 0),
     )
     with pytest.raises(ValueError, match="timezone-aware"):
         observation_document(naive, source_version=BUILD)

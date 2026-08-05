@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -31,6 +31,6 @@ class Experiment:
             id=uuid4(),
             name=name,
             hypothesis=hypothesis,
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             evidence=evidence or {},
         )

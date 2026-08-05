@@ -9,7 +9,7 @@ See standards/testing.md in JAM.
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from atlas_core import OperationalRecord
@@ -22,7 +22,7 @@ from atlas_core.documents import (
 from atlas_core.reasoning_pipeline import ReasoningPipeline
 
 BUILD = "0.4.1"
-RUN_AT = datetime(2026, 7, 1, 15, 0, tzinfo=timezone.utc)
+RUN_AT = datetime(2026, 7, 1, 15, 0, tzinfo=UTC)
 
 RECORDS = [
     ("tabc", "Fonda San Miguel", "2026-06", "sales", "wine_receipts", 50000.0),
@@ -81,7 +81,9 @@ def test_emitted_documents_satisfy_the_contract(kind, emitted, validators):
     documents = emitted[kind]
     assert documents, f"the pipeline emitted no {kind} to validate"
     for document in documents:
-        errors = sorted(validators[kind].iter_errors(document), key=lambda e: list(e.path))
+        errors = sorted(
+            validators[kind].iter_errors(document), key=lambda e: list(e.path)
+        )
         assert not errors, _describe(kind, document, errors)
 
 

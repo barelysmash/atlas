@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from atlas_core.decision import CONFIDENCE_FLOOR, Decision
 from atlas_core.insight import Insight
@@ -21,7 +21,7 @@ def generate_decisions(
     Insights below the emission floor produce no Decision. An interpretation
     worth recording is not always an action worth recommending.
     """
-    moment = datetime.now(timezone.utc) if now is None else now
+    moment = datetime.now(UTC) if now is None else now
     decisions: list[Decision] = []
     for insight in insights:
         if insight.statement != WINE_INSIGHT:

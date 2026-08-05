@@ -7,8 +7,7 @@ def test_import_restaurant_csv(tmp_path: Path):
     csv_path = tmp_path / "restaurant.csv"
 
     csv_path.write_text(
-        "restaurant,period,revenue\n"
-        "Fonda San Miguel,2026-03,236568\n",
+        "restaurant,period,revenue\nFonda San Miguel,2026-03,236568\n",
         encoding="utf-8",
     )
 

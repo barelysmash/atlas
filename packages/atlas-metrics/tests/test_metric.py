@@ -1,5 +1,4 @@
 import pytest
-
 from atlas_metrics import Metric, MetricEngine
 
 

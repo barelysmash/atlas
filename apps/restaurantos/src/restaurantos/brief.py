@@ -6,7 +6,8 @@ def generate_tabc_brief(records: list[TABCRecord], restaurant: str) -> str:
         raise ValueError("records are required")
 
     matching_records = [
-        record for record in records
+        record
+        for record in records
         if restaurant.lower() in record.location_name.lower()
         or restaurant.lower() in record.taxpayer_name.lower()
     ]

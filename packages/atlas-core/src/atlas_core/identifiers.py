@@ -12,7 +12,7 @@ more.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _TIMESTAMP_BITS = 48
@@ -45,7 +45,7 @@ def new_ulid(now: datetime | None = None) -> str:
     lexicographic order matches creation order. Pass ``now`` to make the
     timestamp component deterministic in tests.
     """
-    moment = now if now is not None else datetime.now(timezone.utc)
+    moment = now if now is not None else datetime.now(UTC)
     if moment.tzinfo is None:
         raise ValueError("now must be timezone-aware")
 

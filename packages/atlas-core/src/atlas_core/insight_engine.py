@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from atlas_core.evidence_item import EvidenceItem
 from atlas_core.insight import Insight
@@ -15,7 +15,7 @@ def generate_insights(
 
     The clock is injectable so a run can be reproduced.
     """
-    moment = datetime.now(timezone.utc) if now is None else now
+    moment = datetime.now(UTC) if now is None else now
     insights: list[Insight] = []
     for observation in observations:
         if observation.has_metric(WINE_RECEIPTS):

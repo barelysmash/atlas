@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -46,6 +46,6 @@ class OperationalRecord:
             category=category,
             metric=metric,
             value=float(value),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             dimensions=dimensions or {},
         )
