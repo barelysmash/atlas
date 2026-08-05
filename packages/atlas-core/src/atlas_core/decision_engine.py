@@ -8,7 +8,7 @@ def generate_decisions(insights: list[Insight]) -> list[Decision]:
     decisions: list[Decision] = []
 
     for insight in insights:
-        if insight.summary == "Wine remains an active revenue contributor.":
+        if insight.statement == "Wine remains an active revenue contributor.":
             decisions.append(
                 Decision(
                     summary="Continue promoting premium wine.",

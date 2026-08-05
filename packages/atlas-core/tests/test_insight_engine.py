@@ -4,6 +4,7 @@ from atlas_core import Metric, Observation
 from atlas_core.insight_engine import generate_insights
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
 
 
 def _observation(metric_name: str, value: float) -> Observation:
@@ -19,15 +20,31 @@ def _observation(metric_name: str, value: float) -> Observation:
 
 def test_generate_insights_from_wine_observation():
     observation = _observation("wine_receipts", 50000.0)
-    insights = generate_insights([observation])
+    insights = generate_insights([observation], now=NOW)
     assert len(insights) == 1
-    assert insights[0].summary == "Wine remains an active revenue contributor."
+    assert insights[0].statement == "Wine remains an active revenue contributor."
     assert insights[0].confidence == 0.80
-    assert insights[0].observations == [observation]
+
+
+def test_generated_insight_cites_the_observation():
+    observation = _observation("wine_receipts", 50000.0)
+    insight = generate_insights([observation], now=NOW)[0]
+    assert insight.cites(observation.observation_id)
+    assert insight.evidence[0].metric == observation.get_metric("wine_receipts")
+
+
+def test_generated_insight_inherits_the_domain():
+    insight = generate_insights([_observation("wine_receipts", 50000.0)], now=NOW)[0]
+    assert insight.domain == "sales"
+
+
+def test_the_clock_is_injectable():
+    insight = generate_insights([_observation("wine_receipts", 50000.0)], now=NOW)[0]
+    assert insight.created_at == NOW
 
 
 def test_generate_insights_ignores_unknown_metrics():
-    assert generate_insights([_observation("unknown_metric", 1.0)]) == []
+    assert generate_insights([_observation("unknown_metric", 1.0)], now=NOW) == []
 
 
 def test_wine_receipts_is_found_among_several_metrics():
@@ -40,4 +57,6 @@ def test_wine_receipts_is_found_among_several_metrics():
         ),
         observed_at=OBSERVED_AT,
     )
-    assert len(generate_insights([observation])) == 1
+    insight = generate_insights([observation], now=NOW)[0]
+    assert insight.evidence[0].metric is not None
+    assert insight.evidence[0].metric.name == "wine_receipts"

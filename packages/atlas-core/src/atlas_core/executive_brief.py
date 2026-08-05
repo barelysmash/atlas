@@ -19,7 +19,7 @@ class ExecutiveBrief:
             f"- {observation.summary}" for observation in result.observations
         )
 
-        insights = "\n".join(f"- {insight.summary}" for insight in result.insights)
+        insights = "\n".join(f"- {insight.statement}" for insight in result.insights)
 
         decisions = "\n".join(f"- {decision.summary}" for decision in result.decisions)
 

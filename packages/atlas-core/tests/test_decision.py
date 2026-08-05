@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
-from atlas_core import Decision, Insight, Metric, Observation
+from atlas_core import Decision, EvidenceItem, Insight, Metric, Observation
 
 OBSERVED_AT = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+CREATED_AT = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
 
 
 def test_create_decision_from_insights():
@@ -16,9 +17,11 @@ def test_create_decision_from_insights():
     )
 
     insight = Insight(
-        summary="Wine performance is meaningful enough to monitor.",
+        domain="operations",
+        statement="Wine performance is meaningful enough to monitor.",
         confidence=0.8,
-        observations=[observation],
+        evidence=(EvidenceItem.citing(observation, "wine_receipts"),),
+        created_at=CREATED_AT,
     )
 
     decision = Decision(
