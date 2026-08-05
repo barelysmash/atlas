@@ -48,9 +48,6 @@ def test_import_tabc_csv(tmp_path: Path):
     assert record.total_receipts == 175000.0
 
 
-from restaurantos.tabc_importer import TABCRecord, normalize_tabc_records
-
-
 def test_normalize_tabc_records():
     records = [
         TABCRecord(

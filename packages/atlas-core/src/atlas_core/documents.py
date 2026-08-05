@@ -63,12 +63,12 @@ def _check_source_version(source_version: str) -> str:
 def _timestamp(moment: datetime) -> str:
     """RFC 3339 in UTC with a Z suffix, as every contract timestamp requires.
 
-    Sub-second precision is dropped. Nothing in the contracts depends on it,
-    and second resolution keeps emitted documents comparable.
+    Serialized the way standards/python.md specifies, which preserves
+    sub-second precision where the source has it.
     """
     if moment.tzinfo is None:
         raise ValueError("timestamps must be timezone-aware")
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _prune(document: dict[str, Any]) -> dict[str, Any]:
