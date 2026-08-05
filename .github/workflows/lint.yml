@@ -1,0 +1,46 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Ruff and mypy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.16.1 mypy==2.3.0 pytest pytest-cov jsonschema
+          pip install -e packages/atlas-core -e packages/atlas-events \
+                      -e packages/atlas-memory -e packages/atlas-metrics \
+                      -e apps/restaurantos
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+      - name: mypy
+        run: |
+          mypy packages/atlas-core/src/atlas_core \
+               packages/atlas-events/src/atlas_events \
+               packages/atlas-memory/src/atlas_memory \
+               packages/atlas-metrics/src/atlas_metrics \
+               apps/restaurantos/src/restaurantos
