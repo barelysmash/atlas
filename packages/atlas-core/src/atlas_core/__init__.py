@@ -1,6 +1,9 @@
+from atlas_core.blocking import block_records
 from atlas_core.data_gap import DataGap
 from atlas_core.decision import Decision
 from atlas_core.decision_engine import generate_decisions
+from atlas_core.derived_metric import DerivedMetric
+from atlas_core.derived_metric_engine import derive_metrics
 from atlas_core.evidence_item import EvidenceItem
 from atlas_core.executive_brief import ExecutiveBrief
 from atlas_core.goal import Goal, MetricTarget
@@ -17,6 +20,7 @@ from atlas_core.recommendation import Recommendation
 __all__ = [
     "DataGap",
     "Decision",
+    "DerivedMetric",
     "EvidenceItem",
     "ExecutiveBrief",
     "Goal",
@@ -28,6 +32,8 @@ __all__ = [
     "ReasoningPipeline",
     "ReasoningResult",
     "Recommendation",
+    "block_records",
+    "derive_metrics",
     "generate_decisions",
     "generate_insights",
     "generate_observations",
