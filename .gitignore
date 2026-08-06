@@ -27,3 +27,6 @@ fix-*.sh
 .coverage
 .pytest_cache/
 *.egg-info/
+
+# apply-lib.sh is committed tooling, not a one-off script.
+!scripts/apply-lib.sh
