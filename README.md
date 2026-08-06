@@ -1,5 +1,9 @@
 # Operational Intelligence Platform
 
+**Platform role:** Operational intelligence for BarelySmash: observes operational records, interprets them against declared goals, and emits Decisions.
+
+Built with JAM — the [JARVIS Architecture Manual](https://github.com/barelysmash/JAM).
+
 > We help restaurants learn faster than they forget.
 
 RestaurantOS is proof that hospitality can be improved through evidence without sacrificing humanity.
