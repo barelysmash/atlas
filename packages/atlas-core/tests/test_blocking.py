@@ -155,7 +155,8 @@ def test_a_daily_record_must_carry_a_date():
 
 
 def test_metrics_are_blocked_independently():
-    records = run(7) + [
+    records = [
+        *run(7),
         make_record("2026-05", "wine_receipts", 49000.0, grain="monthly"),
     ]
 
