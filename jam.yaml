@@ -14,4 +14,10 @@ scaffold:
   version: "1.0.0"
 
 python:
-  package: "atlas_core"
+  layout: "monorepo"
+  packages:
+    - "packages/atlas-core"
+    - "packages/atlas-events"
+    - "packages/atlas-memory"
+    - "packages/atlas-metrics"
+    - "apps/restaurantos"
