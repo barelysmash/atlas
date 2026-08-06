@@ -1,5 +1,6 @@
 from atlas_core.blocking import block_records
 from atlas_core.data_gap import DataGap
+from atlas_core.data_gap_engine import generate_data_gaps
 from atlas_core.decision import Decision
 from atlas_core.decision_engine import generate_decisions
 from atlas_core.derived_metric import DerivedMetric
@@ -16,6 +17,7 @@ from atlas_core.operational_record import OperationalRecord
 from atlas_core.reasoning_pipeline import ReasoningPipeline
 from atlas_core.reasoning_result import ReasoningResult
 from atlas_core.recommendation import Recommendation
+from atlas_core.trend_observation_engine import generate_trend_observations
 
 __all__ = [
     "DataGap",
@@ -34,7 +36,9 @@ __all__ = [
     "Recommendation",
     "block_records",
     "derive_metrics",
+    "generate_data_gaps",
     "generate_decisions",
     "generate_insights",
     "generate_observations",
+    "generate_trend_observations",
 ]
