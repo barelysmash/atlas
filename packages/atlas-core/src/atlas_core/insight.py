@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from atlas_core.evidence_item import EvidenceItem
+from atlas_core.goal import Goal
 from atlas_core.identifiers import new_insight_id
 
 
@@ -20,6 +21,11 @@ class Insight:
     An Insight has no category. Categories classify recommended action, and an
     Insight recommends nothing.
 
+    ``goal`` records the goal the interpretation was formed under. Meaning is
+    relative to a goal, and the same movement supports one and undermines
+    another. It is internal reasoning state and does not serialise: JAM's
+    Insight contract carries the conclusion, not the engine's configuration.
+
     Unlike a Decision, confidence has no emission floor. A tentative
     interpretation is worth recording; a tentative recommendation is not.
     """
@@ -30,6 +36,8 @@ class Insight:
     evidence: tuple[EvidenceItem, ...]
     created_at: datetime
     method: str | None = None
+    goal: Goal | None = None
+    assessment: str | None = None
     insight_id: str = field(default_factory=new_insight_id, compare=False)
 
     def cites(self, observation_id: str) -> bool:

@@ -1,3 +1,4 @@
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -14,6 +15,12 @@ FLAT = "flat"
 OBSERVED_DIRECTIONS = (UP, DOWN, FLAT)
 
 PRIORITIES = ("low", "medium", "high")
+
+# Decisions carry an engine-namespaced category drawn from JAM's registry.
+# A Goal declares which one its decisions belong to, because that is domain
+# knowledge about the goal rather than something an engine can infer from a
+# metric name.
+CATEGORY_PATTERN = re.compile(r"^atlas\.[a-z][a-z0-9_]*$")
 
 FAVORABLE_MOVES = {
     INCREASE: UP,
@@ -89,6 +96,7 @@ class Goal:
     summary: str
     targets: tuple[MetricTarget, ...] = field(default_factory=tuple)
     priority: str = "medium"
+    category: str | None = None
 
     @classmethod
     def create(
@@ -96,16 +104,24 @@ class Goal:
         summary: str,
         targets: Sequence[MetricTarget] | None = None,
         priority: str = "medium",
+        category: str | None = None,
     ) -> "Goal":
         if not summary:
             raise ValueError("summary is required")
         if priority not in PRIORITIES:
             raise ValueError(f"priority must be one of {PRIORITIES}")
+        if category is not None and not CATEGORY_PATTERN.match(category):
+            raise ValueError(
+                f"category {category!r} is not an Atlas decision category; "
+                "those are registered in JAM's glossary and look like "
+                "atlas.marketing"
+            )
 
         return cls(
             summary=summary,
             targets=tuple(targets or ()),
             priority=priority,
+            category=category,
         )
 
     @property

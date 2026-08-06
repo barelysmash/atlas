@@ -12,7 +12,7 @@ import re
 from datetime import UTC, datetime
 
 import pytest
-from atlas_core import OperationalRecord
+from atlas_core import Goal, MetricTarget, OperationalRecord
 from atlas_core.documents import (
     SCHEMA_VERSIONS,
     decision_document,
@@ -24,47 +24,80 @@ from atlas_core.reasoning_pipeline import ReasoningPipeline
 BUILD = "0.4.1"
 RUN_AT = datetime(2026, 7, 1, 15, 0, tzinfo=UTC)
 
-RECORDS = [
-    ("tabc", "Fonda San Miguel", "2026-06", "sales", "wine_receipts", 50000.0),
-    ("tabc", "Fonda San Miguel", "2026-05", "sales", "wine_receipts", 41200.0),
-    ("tabc", "Casa Madero", "2026-06", "beverage", "wine_receipts", 8346.5),
-    ("pos", "Fonda San Miguel", "2026-06", "sales", "beer_receipts", 25000.0),
+# Reasoning is goal-directed, so a pipeline with no goals emits observations
+# and nothing else. The samples have to come from a pipeline configured the way
+# a real one is, or two of the three document kinds would never be exercised.
+GOALS = [
+    Goal.create(
+        summary="Grow beverage revenue.",
+        targets=[MetricTarget("wine_receipts", "increase")],
+        priority="high",
+        category="atlas.marketing",
+    ),
+    Goal.create(
+        summary="Hold beer volume through the remodel.",
+        targets=[MetricTarget("beer_receipts", "maintain", tolerance=5.0)],
+        priority="medium",
+        category="atlas.inventory",
+    ),
+    # Tracked, never reported: exercises the data gap path alongside the rest.
+    Goal.create(
+        summary="Improve food cost.",
+        targets=[MetricTarget("food_cost_pct", "decrease")],
+        priority="high",
+        category="atlas.vendor",
+    ),
 ]
+
+RISING = [44000.0, 46000.0, 48000.0, 50000.0]
+FALLING = [26000.0, 25500.0, 24000.0, 21000.0]
+
+
+def _records(metric: str, values: list[float]) -> list[OperationalRecord]:
+    return [
+        OperationalRecord.create(
+            source="tabc",
+            entity="Fonda San Miguel",
+            period=f"2026-{month:02d}",
+            category="beverage",
+            metric=metric,
+            value=value,
+            grain="monthly",
+        )
+        for month, value in enumerate(values, start=3)
+    ]
 
 
 def _emit() -> dict[str, list[dict]]:
-    """Run the pipeline over several records and serialize everything."""
-    emitted: dict[str, list[dict]] = {
-        "observation": [],
-        "insight": [],
-        "decision": [],
-    }
-    pipeline = ReasoningPipeline()
-    for source, entity, period, category, metric, value in RECORDS:
-        record = OperationalRecord.create(
-            source=source,
-            entity=entity,
-            period=period,
-            category=category,
-            metric=metric,
-            value=value,
-        )
-        result = pipeline.run(record)
-        emitted["observation"] += [
+    """Run the pipeline over a window and serialize everything it produced."""
+    result = ReasoningPipeline(GOALS).run_window(
+        _records("wine_receipts", RISING) + _records("beer_receipts", FALLING),
+        now=RUN_AT,
+    )
+
+    return {
+        "observation": [
             observation_document(o, source_version=BUILD) for o in result.observations
-        ]
-        emitted["insight"] += [
-            insight_document(i, source_version=BUILD) for i in result.insights
-        ]
-        emitted["decision"] += [
+        ],
+        "insight": [insight_document(i, source_version=BUILD) for i in result.insights],
+        "decision": [
             decision_document(d, source_version=BUILD) for d in result.decisions
-        ]
-    return emitted
+        ],
+    }
 
 
 @pytest.fixture(scope="session")
 def emitted() -> dict[str, list[dict]]:
     return _emit()
+
+
+@pytest.fixture(scope="session")
+def gaps() -> list[str]:
+    result = ReasoningPipeline(GOALS).run_window(
+        _records("wine_receipts", RISING) + _records("beer_receipts", FALLING),
+        now=RUN_AT,
+    )
+    return [gap.metric for gap in result.gaps]
 
 
 def _describe(kind: str, document: dict, errors: list) -> str:
@@ -82,7 +115,8 @@ def test_emitted_documents_satisfy_the_contract(kind, emitted, validators):
     assert documents, f"the pipeline emitted no {kind} to validate"
     for document in documents:
         errors = sorted(
-            validators[kind].iter_errors(document), key=lambda e: list(e.path)
+            validators[kind].iter_errors(document),
+            key=lambda e: list(e.path),
         )
         assert not errors, _describe(kind, document, errors)
 
@@ -147,7 +181,8 @@ def test_a_cited_metric_matches_the_observation_it_names(emitted):
                     continue
                 source = by_id[item["observation_id"]]
                 match = next(
-                    (m for m in source["metrics"] if m["name"] == metric["name"]), None
+                    (m for m in source["metrics"] if m["name"] == metric["name"]),
+                    None,
                 )
                 assert match is not None, (
                     f"cites metric {metric['name']} of "
@@ -157,3 +192,13 @@ def test_a_cited_metric_matches_the_observation_it_names(emitted):
                     f"the copy of {metric['name']} in this {kind} disagrees "
                     f"with {item['observation_id']}"
                 )
+
+
+def test_a_goal_metric_with_no_data_is_reported_rather_than_passed_over(gaps):
+    """Silence is indistinguishable from nothing being wrong."""
+    assert "food_cost_pct" in gaps
+
+
+def test_every_decision_carries_a_registered_category_shape(emitted):
+    for decision in emitted["decision"]:
+        assert re.match(r"^atlas\.[a-z][a-z0-9_]*$", decision["category"])
