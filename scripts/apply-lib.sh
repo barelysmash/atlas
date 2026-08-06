@@ -114,22 +114,26 @@ apply_workspace() {
   [ $# -gt 0 ] || apply_die "apply_workspace needs at least one tree"
   APPLY_TREES=("$@")
 
-  local tree
-  for tree in "${APPLY_TREES[@]}"; do
-    [ -e "$tree" ] || apply_die "$tree does not exist"
-  done
-
   APPLY_ROOT="$(mktemp -d)"
   trap apply_cleanup EXIT
 
   # Tracked files only. Copying the working tree wholesale drags in
   # __pycache__ and coverage data, which then get committed by git add -A in
   # a repository that has not ignored them.
+  # A path may not exist yet: a change that creates a file names it here so
+  # the file is written, verified, and landed like any other.
+  local tree existing=()
+  for tree in "${APPLY_TREES[@]}"; do
+    [ -e "$tree" ] && existing+=("$tree")
+  done
+
   local file
-  while IFS= read -r -d '' file; do
-    mkdir -p "$APPLY_ROOT/$(dirname "$file")"
-    cp "$file" "$APPLY_ROOT/$file"
-  done < <(git ls-files -z -- "${APPLY_TREES[@]}")
+  if [ ${#existing[@]} -gt 0 ]; then
+    while IFS= read -r -d '' file; do
+      mkdir -p "$APPLY_ROOT/$(dirname "$file")"
+      cp "$file" "$APPLY_ROOT/$file"
+    done < <(git ls-files -z -- "${existing[@]}")
+  fi
 
   apply_note "working in a scratch copy of: ${APPLY_TREES[*]}"
 }
@@ -194,16 +198,26 @@ apply_land() {
   # no longer contains. Deleting the directory first would be simpler and
   # would also destroy a developer's untracked files, which are none of this
   # script's business.
-  local tree file
+  local tree file existing=()
   for tree in "${APPLY_TREES[@]}"; do
-    [ -d "$APPLY_ROOT/$tree" ] || apply_die "scratch copy of $tree vanished"
-    cp -r "$APPLY_ROOT/$tree/." "$tree/"
+    if [ -d "$APPLY_ROOT/$tree" ]; then
+      mkdir -p "$tree"
+      cp -r "$APPLY_ROOT/$tree/." "$tree/"
+    elif [ -f "$APPLY_ROOT/$tree" ]; then
+      mkdir -p "$(dirname "$tree")"
+      cp "$APPLY_ROOT/$tree" "$tree"
+    else
+      apply_die "the change produced nothing at $tree"
+    fi
+    [ -e "$tree" ] && existing+=("$tree")
   done
   APPLY_LANDED=1
 
-  while IFS= read -r -d '' file; do
-    [ -e "$APPLY_ROOT/$file" ] || rm -f "$file"
-  done < <(git ls-files -z -- "${APPLY_TREES[@]}")
+  if [ ${#existing[@]} -gt 0 ]; then
+    while IFS= read -r -d '' file; do
+      [ -e "$APPLY_ROOT/$file" ] || rm -f "$file"
+    done < <(git ls-files -z -- "${existing[@]}")
+  fi
 
   git add -A "${APPLY_TREES[@]}"
 
