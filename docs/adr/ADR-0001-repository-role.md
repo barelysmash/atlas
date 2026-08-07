@@ -76,18 +76,6 @@ application, not part of the engine, and the manifest has one repository type.
 It reaches into `atlas_core` through a relative `pythonpath` and would be a
 separate repository if it were larger. *Temporary; remediation is extraction.*
 
-**The CI workflow is not named `ci.yml`.** Atlas runs two workflows,
-`python-tests.yml` and `lint.yml`, producing six required status checks on
-`main`. Renaming them to satisfy a filename check would invalidate branch
-protection. The underlying requirement — that CI runs ruff, mypy, and pytest —
-is met. *Permanent, pending a conformance rule that matches on content.*
-
-**The root `pyproject.toml` has no `[project]` table.** Atlas is a monorepo;
-package metadata lives in each `packages/*/pyproject.toml`, and the root file
-carries only the shared ruff and mypy configuration that
-`standards/python.md` specifies. A root `[project]` would describe a
-distribution that does not exist. *Permanent.*
-
 **`Goal.category` is validated for shape, not membership.** Atlas checks that
 a category matches `^atlas\.[a-z][a-z0-9_]*$` but does not carry JAM's
 category registry, so an unregistered but well-formed value passes locally and
