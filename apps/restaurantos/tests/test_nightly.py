@@ -1,10 +1,15 @@
 from datetime import date
 
 import pytest
-from atlas_core.derived_metric_engine import derive_metrics
 
+from atlas_core.derived_metric_engine import derive_metrics
 from restaurantos.metrics import NIGHTLY_DERIVED_METRICS
-from restaurantos.nightly import CompLine, FeatureSale, NightlyReport, normalize_nightly_report
+from restaurantos.nightly import (
+    CompLine,
+    FeatureSale,
+    NightlyReport,
+    normalize_nightly_report,
+)
 
 
 def by_metric(records):
@@ -70,7 +75,10 @@ def test_dynamic_comp_and_feature_lines_are_preserved_as_dimensions():
 
 
 def test_derived_metrics_match_sample():
-    records = derive_metrics(normalize_nightly_report(sample()), NIGHTLY_DERIVED_METRICS)
+    records = derive_metrics(
+        normalize_nightly_report(sample()),
+        NIGHTLY_DERIVED_METRICS,
+    )
     metrics = by_metric(records)
 
     assert metrics["splh"].value == pytest.approx(78.01)
@@ -91,13 +99,22 @@ def test_actual_vs_scheduled_labor_produces_variances():
         labor_hours_scheduled=350.75,
     )
     metrics = by_metric(
-        derive_metrics(normalize_nightly_report(report), NIGHTLY_DERIVED_METRICS)
+        derive_metrics(
+            normalize_nightly_report(report),
+            NIGHTLY_DERIVED_METRICS,
+        )
     )
 
     assert metrics["labor_cost_variance"].value == pytest.approx(-318.69)
-    assert metrics["labor_cost_to_schedule_pct"].value == pytest.approx(93.9298, rel=1e-4)
+    assert metrics["labor_cost_to_schedule_pct"].value == pytest.approx(
+        93.9298,
+        rel=1e-4,
+    )
     assert metrics["labor_hours_variance"].value == pytest.approx(-20.84)
-    assert metrics["labor_hours_to_schedule_pct"].value == pytest.approx(94.0584, rel=1e-4)
+    assert metrics["labor_hours_to_schedule_pct"].value == pytest.approx(
+        94.0584,
+        rel=1e-4,
+    )
 
 
 def test_room_mismatch_is_flagged_but_not_rejected():
@@ -105,12 +122,19 @@ def test_room_mismatch_is_flagged_but_not_rejected():
 
     assert "room_total_mismatch" in report.quality_flags
     records = normalize_nightly_report(report)
-    guest_count = next(record for record in records if record.metric == "guest_count")
+    guest_count = next(
+        record for record in records if record.metric == "guest_count"
+    )
     assert "room_total_mismatch" in guest_count.dimensions["quality_flags"]
 
 
 def test_missing_structured_total_uses_rooms_and_flags_narrative_disagreement():
-    report = sample(total_covers=None, dining_room_covers=235, bar_atrium_covers=106, narrative_total_covers=235)
+    report = sample(
+        total_covers=None,
+        dining_room_covers=235,
+        bar_atrium_covers=106,
+        narrative_total_covers=235,
+    )
 
     assert report.effective_total_covers == 341
     assert "narrative_total_mismatch" in report.quality_flags
