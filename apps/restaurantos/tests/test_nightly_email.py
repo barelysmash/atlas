@@ -2,7 +2,6 @@ from datetime import date
 
 from restaurantos.nightly_email import parse_nightly_email
 
-
 AUG_10 = """
 Net Sales: $ 19,335.56 SPLH: $
 77.38 Labor: $ 3,698.87 Hours: $
@@ -102,7 +101,10 @@ def test_projected_actual_labor_dynamic_comps_and_features_parse():
         "Tom Tab",
         "Training Meal",
     }
-    assert [(sale.item, sale.sales, sale.quantity) for sale in report.feature_sales] == [
+    parsed_features = [
+        (sale.item, sale.sales, sale.quantity) for sale in report.feature_sales
+    ]
+    assert parsed_features == [
         ("Camarones", 720.57, 19),
         ("Tlocoyo", 120.0, 11),
         ("Tart", 96.0, 6),
