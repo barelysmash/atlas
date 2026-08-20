@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from restaurantos.nightly_backfill import (
     NightlyEmailMessage,
@@ -24,7 +24,7 @@ def message(
 def test_subject_date_handles_after_midnight_delivery():
     service_date, warnings = infer_service_date(
         "EOD 07.31.26",
-        datetime(2026, 8, 1, 0, 16, tzinfo=timezone.utc),
+        datetime(2026, 8, 1, 0, 16, tzinfo=UTC),
     )
 
     assert service_date.isoformat() == "2026-07-31"
@@ -34,7 +34,7 @@ def test_subject_date_handles_after_midnight_delivery():
 def test_implausible_subject_date_falls_back_to_sent_date_and_flags():
     service_date, warnings = infer_service_date(
         "EOD 06.01.26",
-        datetime(2026, 7, 1, 23, 17, tzinfo=timezone.utc),
+        datetime(2026, 7, 1, 23, 17, tzinfo=UTC),
     )
 
     assert service_date.isoformat() == "2026-07-01"
@@ -44,7 +44,7 @@ def test_implausible_subject_date_falls_back_to_sent_date_and_flags():
 def test_yearless_subject_uses_nearest_calendar_year():
     service_date, warnings = infer_service_date(
         "EOD 12/31",
-        datetime(2027, 1, 1, 0, 10, tzinfo=timezone.utc),
+        datetime(2027, 1, 1, 0, 10, tzinfo=UTC),
     )
 
     assert service_date.isoformat() == "2026-12-31"
@@ -62,7 +62,7 @@ def test_correction_reply_amends_primary_without_becoming_duplicate_night():
         Hours: $ 250.00
         Reservations: 230
         """,
-        datetime(2026, 6, 22, 23, 11, tzinfo=timezone.utc),
+        datetime(2026, 6, 22, 23, 11, tzinfo=UTC),
     )
     correction = message(
         "correction",
@@ -75,7 +75,7 @@ def test_correction_reply_amends_primary_without_becoming_duplicate_night():
         SPLH: $ 72.00
         Reservations: 230
         """,
-        datetime(2026, 6, 22, 23, 15, tzinfo=timezone.utc),
+        datetime(2026, 6, 22, 23, 15, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((primary, correction))
@@ -95,19 +95,19 @@ def test_plain_reply_and_reaction_are_skipped():
         "primary",
         "EOD 08.14.26",
         "SPLH: $ 80.00\nLabor: $ 4000\nHours: $ 250\nTotal: 400\n",
-        datetime(2026, 8, 14, 23, 55, tzinfo=timezone.utc),
+        datetime(2026, 8, 14, 23, 55, tzinfo=UTC),
     )
     reply = message(
         "reply",
         "Re: EOD 08.14.26",
         "Gracias Paul\n\nOn Fri, Aug 14, 2026 at 11:55 PM Paul wrote:\nSPLH: $ 80",
-        datetime(2026, 8, 15, 0, 5, tzinfo=timezone.utc),
+        datetime(2026, 8, 15, 0, 5, tzinfo=UTC),
     )
     reaction = message(
         "reaction",
         "Re: EOD 08.14.26",
         "💖 Carlos Diaz reacted via Gmail",
-        datetime(2026, 8, 15, 0, 6, tzinfo=timezone.utc),
+        datetime(2026, 8, 15, 0, 6, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((primary, reply, reaction))
@@ -131,7 +131,7 @@ def test_forward_is_primary_fallback_when_original_is_missing():
         Bar / Atrium: 110
         Total: 370
         """,
-        datetime(2026, 7, 23, 7, 49, tzinfo=timezone.utc),
+        datetime(2026, 7, 23, 7, 49, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((forwarded,))
@@ -146,13 +146,13 @@ def test_multiple_direct_reports_choose_latest_and_request_review():
         "early",
         "Fonda SM EOD Report, 7/15/2026",
         "SPLH: $ 70\nLabor: $ 3000\nHours: $ 200\nTotal: 300\n",
-        datetime(2026, 7, 15, 0, 35, tzinfo=timezone.utc),
+        datetime(2026, 7, 15, 0, 35, tzinfo=UTC),
     )
     late = message(
         "late",
         "EOD 07.15.26",
         "SPLH: $ 90\nLabor: $ 4500\nHours: $ 300\nTotal: 450\n",
-        datetime(2026, 7, 15, 23, 0, tzinfo=timezone.utc),
+        datetime(2026, 7, 15, 23, 0, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((early, late))
@@ -176,7 +176,7 @@ def test_reply_with_metric_block_updates_only_present_fields():
         Bar / Atrium: 276
         Total: 622
         """,
-        datetime(2026, 7, 26, 0, 30, tzinfo=timezone.utc),
+        datetime(2026, 7, 26, 0, 30, tzinfo=UTC),
     )
     correction = message(
         "correction",
@@ -191,7 +191,7 @@ def test_reply_with_metric_block_updates_only_present_fields():
         SPLH: $ 100.00
         Total: 622
         """,
-        datetime(2026, 7, 26, 0, 36, tzinfo=timezone.utc),
+        datetime(2026, 7, 26, 0, 36, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((primary, correction))
@@ -214,7 +214,7 @@ def test_obvious_labor_hour_transposition_is_repaired_and_flagged():
         Horas: $3557.97
         Total: 374
         """,
-        datetime(2026, 6, 22, 23, 11, tzinfo=timezone.utc),
+        datetime(2026, 6, 22, 23, 11, tzinfo=UTC),
     )
 
     result = backfill_nightly_emails((primary,))
