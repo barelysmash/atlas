@@ -202,3 +202,24 @@ def test_reply_with_metric_block_updates_only_present_fields():
     assert report.labor_hours_actual == 324.18
     assert report.voids == 190.50
     assert report.total_covers == 622
+
+
+def test_obvious_labor_hour_transposition_is_repaired_and_flagged():
+    primary = message(
+        "primary",
+        "EOD 6/22",
+        """
+        SPLH: $69.98
+        Labor: $227.54
+        Horas: $3557.97
+        Total: 374
+        """,
+        datetime(2026, 6, 22, 23, 11, tzinfo=timezone.utc),
+    )
+
+    result = backfill_nightly_emails((primary,))
+    entry = result.entries[0]
+
+    assert entry.report.labor_cost_actual == 3557.97
+    assert entry.report.labor_hours_actual == 227.54
+    assert "labor_hours_probably_swapped" in entry.warnings
