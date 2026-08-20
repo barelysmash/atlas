@@ -38,7 +38,10 @@ def _first_number(text: str, labels: tuple[str, ...]) -> int | None:
 def _money_count(text: str, labels: tuple[str, ...]) -> int | None:
     for label in labels:
         match = re.search(
-            rf"{label}\s*:\s*\$?\s*(?:-|[0-9][0-9,]*(?:\.\d+)?)\s*\((\d+)\)",
+            (
+                rf"{label}\s*:\s*\$?\s*"
+                r"(?:-|[0-9][0-9,]*(?:\.\d+)?)\s*\((\d+)\)"
+            ),
             text,
             re.IGNORECASE,
         )
@@ -86,13 +89,20 @@ def _structured_total(text: str) -> int | None:
 def _comp_section(text: str) -> str:
     heading = re.search(r"Comps and Voids\s*:?", text, re.IGNORECASE)
     if heading:
-        tail = text[heading.end():]
-        stop = re.search(r"\n(?:Best,|Features Sold|Feature Sales|Sales and Labor|Covers)\b", tail, re.IGNORECASE)
+        tail = text[heading.end() :]
+        stop = re.search(
+            (
+                r"\n(?:Best,|Features Sold|Feature Sales|"
+                r"Sales and Labor|Covers)\b"
+            ),
+            tail,
+            re.IGNORECASE,
+        )
         return tail[: stop.start()] if stop else tail
 
     total = re.search(r"Total Comps\s*:", text, re.IGNORECASE)
     if total:
-        tail = text[total.start():]
+        tail = text[total.start() :]
         voids = re.search(r"Total Voids\s*:[^\n]*", tail, re.IGNORECASE)
         return tail[: voids.end()] if voids else tail
 
@@ -139,22 +149,27 @@ def _comp_lines(text: str) -> tuple[CompLine, ...]:
         normalized = re.sub(r"[^a-z0-9]+", " ", label.lower()).strip()
         if normalized in reserved or normalized.startswith("total "):
             continue
+        count = match.group("count")
         lines.append(
             CompLine(
                 category=label,
                 amount=_float(match.group("amount")),
-                count=int(match.group("count")) if match.group("count") else None,
+                count=int(count) if count else None,
             )
         )
     return tuple(lines)
 
 
 def _feature_sales(text: str) -> tuple[FeatureSale, ...]:
-    heading = re.search(r"(?:Feature Sales|Features Sold)\s*:?", text, re.IGNORECASE)
+    heading = re.search(
+        r"(?:Feature Sales|Features Sold)\s*:?",
+        text,
+        re.IGNORECASE,
+    )
     if not heading:
         return ()
 
-    tail = text[heading.end():]
+    tail = text[heading.end() :]
     stop = re.search(
         r"\n(?:Comps and Voids|Best,|Net Sales:|Sales and Labor|Covers)\b",
         tail,
@@ -171,11 +186,12 @@ def _feature_sales(text: str) -> tuple[FeatureSale, ...]:
             line,
         )
         if match:
+            quantity = match.group("quantity")
             features.append(
                 FeatureSale(
                     item=" ".join(match.group("item").split()),
                     sales=_float(match.group("sales")),
-                    quantity=int(match.group("quantity")) if match.group("quantity") else None,
+                    quantity=int(quantity) if quantity else None,
                 )
             )
     return tuple(features)
@@ -210,11 +226,23 @@ def parse_nightly_email(
         labor_hours_actual=hours_actual,
         labor_hours_scheduled=_first_money(
             body,
-            (r"(?:Hours|Horas)\s*\(scheduled\)", r"(?:Hours|Horas)\s*\(projected\)"),
+            (
+                r"(?:Hours|Horas)\s*\(scheduled\)",
+                r"(?:Hours|Horas)\s*\(projected\)",
+            ),
         ),
-        reservation_covers=_first_number(body, (r"Starting Reservations", r"Reservations")),
-        dining_room_covers=_first_number(body, (r"Dining Room EOD Covers", r"Dining Room")),
-        bar_atrium_covers=_first_number(body, (r"Bar\s*/\s*Atrium", r"Atrium\s*/\s*Bar")),
+        reservation_covers=_first_number(
+            body,
+            (r"Starting Reservations", r"Reservations"),
+        ),
+        dining_room_covers=_first_number(
+            body,
+            (r"Dining Room EOD Covers", r"Dining Room"),
+        ),
+        bar_atrium_covers=_first_number(
+            body,
+            (r"Bar\s*/\s*Atrium", r"Atrium\s*/\s*Bar"),
+        ),
         total_covers=_structured_total(body),
         narrative_total_covers=_narrative_total(body),
         comps=_comp_lines(body),
