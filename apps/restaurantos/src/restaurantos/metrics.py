@@ -1,4 +1,8 @@
-from atlas_core.derived_metric import DEFAULT_DERIVED_METRICS, DIFFERENCE, DerivedMetric
+from atlas_core.derived_metric import (
+    DEFAULT_DERIVED_METRICS,
+    DIFFERENCE,
+    DerivedMetric,
+)
 from atlas_core.grain import RATE, SUM
 
 WALK_IN_COVERS = DerivedMetric(
@@ -112,7 +116,8 @@ VOID_PCT = DerivedMetric(
     scale=100.0,
 )
 
-NIGHTLY_DERIVED_METRICS = DEFAULT_DERIVED_METRICS + (
+NIGHTLY_DERIVED_METRICS = (
+    *DEFAULT_DERIVED_METRICS,
     WALK_IN_COVERS,
     RESERVATION_SHARE,
     WALK_IN_SHARE,
