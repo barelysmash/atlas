@@ -3,7 +3,6 @@ from datetime import date
 
 from restaurantos.nightly import CompLine, FeatureSale, NightlyReport
 
-_MONEY = r"(?:\$\s*)?([0-9][0-9,]*(?:\.\d+)?)"
 _NUMBER = r"([0-9][0-9,]*(?:\.\d+)?)"
 
 
@@ -17,7 +16,11 @@ def _int(value: str) -> int:
 
 def _first_money(text: str, labels: tuple[str, ...]) -> float | None:
     for label in labels:
-        match = re.search(rf"{label}\s*:\s*\$?\s*(-|[0-9][0-9,]*(?:\.\d+)?)", text, re.IGNORECASE)
+        match = re.search(
+            rf"{label}\s*:\s*\$?\s*(-|[0-9][0-9,]*(?:\.\d+)?)",
+            text,
+            re.IGNORECASE,
+        )
         if match:
             value = match.group(1)
             return 0.0 if value == "-" else _float(value)
@@ -29,6 +32,18 @@ def _first_number(text: str, labels: tuple[str, ...]) -> int | None:
         match = re.search(rf"{label}\s*:\s*{_NUMBER}", text, re.IGNORECASE)
         if match:
             return _int(match.group(1))
+    return None
+
+
+def _money_count(text: str, labels: tuple[str, ...]) -> int | None:
+    for label in labels:
+        match = re.search(
+            rf"{label}\s*:\s*\$?\s*(?:-|[0-9][0-9,]*(?:\.\d+)?)\s*\((\d+)\)",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return int(match.group(1))
     return None
 
 
@@ -49,13 +64,39 @@ def _narrative_total(text: str) -> int | None:
 
 
 def _structured_total(text: str) -> int | None:
-    match = re.search(r"(?:^|\n)\s*Total\s*:\s*(\d+)\s*(?:\n|$)", text, re.IGNORECASE)
+    match = re.search(
+        r"(?:^|\n)\s*Total\s*:\s*(\d+)\s*(?:\n|$)",
+        text,
+        re.IGNORECASE,
+    )
     if match:
         return int(match.group(1))
-    match = re.search(r"Bar\s*/?\s*Atrium\s*:\s*\d+\s+Total\s*:?[ ]*(\d+)", text, re.IGNORECASE)
+
+    match = re.search(
+        r"Bar\s*/?\s*Atrium\s*:\s*\d+\s+Total\s*:?[ ]*(\d+)",
+        text,
+        re.IGNORECASE,
+    )
     if match:
         return int(match.group(1))
+
     return None
+
+
+def _comp_section(text: str) -> str:
+    heading = re.search(r"Comps and Voids\s*:?", text, re.IGNORECASE)
+    if heading:
+        tail = text[heading.end():]
+        stop = re.search(r"\n(?:Best,|Features Sold|Feature Sales|Sales and Labor|Covers)\b", tail, re.IGNORECASE)
+        return tail[: stop.start()] if stop else tail
+
+    total = re.search(r"Total Comps\s*:", text, re.IGNORECASE)
+    if total:
+        tail = text[total.start():]
+        voids = re.search(r"Total Voids\s*:[^\n]*", tail, re.IGNORECASE)
+        return tail[: voids.end()] if voids else tail
+
+    return text
 
 
 def _comp_lines(text: str) -> tuple[CompLine, ...]:
@@ -85,17 +126,18 @@ def _comp_lines(text: str) -> tuple[CompLine, ...]:
         "total voids",
         "voids",
     }
+    section = _comp_section(text)
     lines: list[CompLine] = []
     pattern = re.compile(
-        rf"(?P<label>[A-Za-z][A-Za-z /&'-]{{1,36}}?)\s*:\s*\$\s*(?P<amount>[0-9][0-9,]*(?:\.\d+)?)(?:\s*\((?P<count>\d+)\))?",
+        r"(?P<label>[A-Za-z][A-Za-z /&'-]{1,36}?)\s*:\s*\$\s*"
+        r"(?P<amount>[0-9][0-9,]*(?:\.\d+)?)"
+        r"(?:\s*\((?P<count>\d+)\))?",
         re.IGNORECASE,
     )
-    for match in pattern.finditer(text):
+    for match in pattern.finditer(section):
         label = " ".join(match.group("label").split()).strip()
         normalized = re.sub(r"[^a-z0-9]+", " ", label.lower()).strip()
         if normalized in reserved or normalized.startswith("total "):
-            continue
-        if normalized in {"camarones", "tlocoyo", "tlacoyo", "tart", "ensalada"}:
             continue
         lines.append(
             CompLine(
@@ -111,14 +153,21 @@ def _feature_sales(text: str) -> tuple[FeatureSale, ...]:
     heading = re.search(r"(?:Feature Sales|Features Sold)\s*:?", text, re.IGNORECASE)
     if not heading:
         return ()
+
     tail = text[heading.end():]
-    stop = re.search(r"\n(?:Comps and Voids|Best,|Net Sales:|Sales and Labor|Covers)\b", tail, re.IGNORECASE)
+    stop = re.search(
+        r"\n(?:Comps and Voids|Best,|Net Sales:|Sales and Labor|Covers)\b",
+        tail,
+        re.IGNORECASE,
+    )
     section = tail[: stop.start()] if stop else tail
 
     features: list[FeatureSale] = []
     for line in section.splitlines():
         match = re.match(
-            rf"\s*[*-]?\s*(?P<item>[^:$]+?)\s*:\s*\$\s*(?P<sales>[0-9][0-9,]*(?:\.\d+)?)\s*(?:\((?P<quantity>\d+)\))?\s*$",
+            r"\s*[*-]?\s*(?P<item>[^:$]+?)\s*:\s*\$\s*"
+            r"(?P<sales>[0-9][0-9,]*(?:\.\d+)?)\s*"
+            r"(?:\((?P<quantity>\d+)\))?\s*$",
             line,
         )
         if match:
@@ -139,12 +188,7 @@ def parse_nightly_email(
     restaurant: str = "Fonda San Miguel",
     source_message_id: str | None = None,
 ) -> NightlyReport:
-    """Parse the semi-structured EOD email body into the nightly domain model.
-
-    The adapter intentionally accepts the field aliases found across Fonda's
-    manager reports. Missing fields remain missing; Atlas derives only from
-    measurements that were actually present.
-    """
+    """Parse a semi-structured Fonda EOD email into the nightly domain model."""
     labor_actual = _first_money(body, (r"Labor\s*\(actual\)",))
     if labor_actual is None:
         labor_actual = _first_money(body, (r"Labor",))
@@ -176,7 +220,7 @@ def parse_nightly_email(
         comps=_comp_lines(body),
         reported_total_comps=_first_money(body, (r"Total Comps",)),
         voids=_first_money(body, (r"Total Voids", r"Voids")),
-        void_count=_first_number(body, (r"Total Voids[^\n]*?\$[^\n]*?\([^)]*",)),
+        void_count=_money_count(body, (r"Total Voids", r"Voids")),
         feature_sales=_feature_sales(body),
         source_message_id=source_message_id,
     )
