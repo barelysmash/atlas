@@ -125,7 +125,11 @@ class NightlyReport:
         flags: list[str] = []
         room_total = self.room_total_covers
 
-        if self.total_covers is not None and room_total is not None and room_total != self.total_covers:
+        if (
+            self.total_covers is not None
+            and room_total is not None
+            and room_total != self.total_covers
+        ):
             flags.append("room_total_mismatch")
         if (
             self.narrative_total_covers is not None
@@ -188,33 +192,136 @@ def normalize_nightly_report(
             dimensions["reported_splh"] = report.reported_splh
         if report.net_sales is None:
             dimensions["basis"] = "reported_splh_x_actual_labor_hours"
-        records.append(_record(report, "net_sales", sales, "sales", source=source, dimensions=dimensions))
+        records.append(
+            _record(
+                report,
+                "net_sales",
+                sales,
+                "sales",
+                source=source,
+                dimensions=dimensions,
+            )
+        )
 
     if report.labor_cost_actual is not None:
-        records.append(_record(report, "labor_cost", report.labor_cost_actual, "labor", source=source))
-        records.append(_record(report, "labor_cost_actual", report.labor_cost_actual, "labor", source=source))
+        records.append(
+            _record(
+                report,
+                "labor_cost",
+                report.labor_cost_actual,
+                "labor",
+                source=source,
+            )
+        )
+        records.append(
+            _record(
+                report,
+                "labor_cost_actual",
+                report.labor_cost_actual,
+                "labor",
+                source=source,
+            )
+        )
     if report.labor_cost_scheduled is not None:
-        records.append(_record(report, "labor_cost_scheduled", report.labor_cost_scheduled, "labor", source=source))
+        records.append(
+            _record(
+                report,
+                "labor_cost_scheduled",
+                report.labor_cost_scheduled,
+                "labor",
+                source=source,
+            )
+        )
     if report.labor_hours_actual is not None:
-        records.append(_record(report, "labor_hours", report.labor_hours_actual, "labor", source=source))
-        records.append(_record(report, "labor_hours_actual", report.labor_hours_actual, "labor", source=source))
+        records.append(
+            _record(
+                report,
+                "labor_hours",
+                report.labor_hours_actual,
+                "labor",
+                source=source,
+            )
+        )
+        records.append(
+            _record(
+                report,
+                "labor_hours_actual",
+                report.labor_hours_actual,
+                "labor",
+                source=source,
+            )
+        )
     if report.labor_hours_scheduled is not None:
-        records.append(_record(report, "labor_hours_scheduled", report.labor_hours_scheduled, "labor", source=source))
+        records.append(
+            _record(
+                report,
+                "labor_hours_scheduled",
+                report.labor_hours_scheduled,
+                "labor",
+                source=source,
+            )
+        )
 
     total_covers = report.effective_total_covers
     if report.reservation_covers is not None:
-        records.append(_record(report, "reservation_covers", report.reservation_covers, "demand", source=source))
+        records.append(
+            _record(
+                report,
+                "reservation_covers",
+                report.reservation_covers,
+                "demand",
+                source=source,
+            )
+        )
     if total_covers is not None:
-        total_dimensions = {"derived_from_rooms": report.total_covers is None and report.room_total_covers is not None}
-        records.append(_record(report, "guest_count", total_covers, "demand", source=source, dimensions=total_dimensions))
+        total_dimensions = {
+            "derived_from_rooms": (
+                report.total_covers is None
+                and report.room_total_covers is not None
+            )
+        }
+        records.append(
+            _record(
+                report,
+                "guest_count",
+                total_covers,
+                "demand",
+                source=source,
+                dimensions=total_dimensions,
+            )
+        )
     if report.dining_room_covers is not None:
-        records.append(_record(report, "dining_room_covers", report.dining_room_covers, "demand", source=source))
+        records.append(
+            _record(
+                report,
+                "dining_room_covers",
+                report.dining_room_covers,
+                "demand",
+                source=source,
+            )
+        )
     if report.bar_atrium_covers is not None:
-        records.append(_record(report, "bar_atrium_covers", report.bar_atrium_covers, "demand", source=source))
+        records.append(
+            _record(
+                report,
+                "bar_atrium_covers",
+                report.bar_atrium_covers,
+                "demand",
+                source=source,
+            )
+        )
 
     total_comps = report.effective_total_comps
     if total_comps is not None:
-        records.append(_record(report, "comps", total_comps, "hospitality", source=source))
+        records.append(
+            _record(
+                report,
+                "comps",
+                total_comps,
+                "hospitality",
+                source=source,
+            )
+        )
     for line in report.comps:
         records.append(
             _record(
