@@ -276,8 +276,7 @@ def normalize_nightly_report(
     if total_covers is not None:
         total_dimensions = {
             "derived_from_rooms": (
-                report.total_covers is None
-                and report.room_total_covers is not None
+                report.total_covers is None and report.room_total_covers is not None
             )
         }
         records.append(
