@@ -69,19 +69,9 @@ class _DatedMessage:
     warnings: tuple[str, ...]
 
 
-def _expand_year(raw_year: str | None, sent_at: datetime) -> int:
-    if raw_year:
-        year = int(raw_year)
-        return 2000 + year if year < 100 else year
-
-    candidates = (sent_at.year - 1, sent_at.year, sent_at.year + 1)
-    month_day = (sent_at.month, sent_at.day)
-    return min(
-        candidates,
-        key=lambda year: abs(
-            (date(year, month_day[0], month_day[1]) - sent_at.date()).days
-        ),
-    )
+def _expand_year(raw_year: str) -> int:
+    year = int(raw_year)
+    return 2000 + year if year < 100 else year
 
 
 def _subject_date(subject: str, sent_at: datetime) -> date | None:
@@ -95,7 +85,7 @@ def _subject_date(subject: str, sent_at: datetime) -> date | None:
     raw_year = match.group("year")
 
     if raw_year:
-        year = _expand_year(raw_year, sent_at)
+        year = _expand_year(raw_year)
         try:
             return date(year, month, day)
         except ValueError:
@@ -131,7 +121,8 @@ def infer_service_date(
 
 
 def _reply_head(body: str) -> str:
-    boundaries = [match.start() for match in (_QUOTED_REPLY.search(body),) if match]
+    quoted = _QUOTED_REPLY.search(body)
+    boundaries = [quoted.start()] if quoted else []
     forwarded = _FORWARDED.search(body)
     if forwarded:
         boundaries.append(forwarded.start())
@@ -231,6 +222,24 @@ def _apply_amendment(
     )
     merged = _merge_report(base, amendment)
     return _apply_compact_cover_amendment(merged, head)
+
+
+def _repair_obvious_labor_swap(report: NightlyReport) -> tuple[NightlyReport, bool]:
+    labor_cost = report.labor_cost_actual
+    labor_hours = report.labor_hours_actual
+    if labor_cost is None or labor_hours is None:
+        return report, False
+    if labor_cost >= 1000 or labor_hours <= 1000:
+        return report, False
+
+    return (
+        replace(
+            report,
+            labor_cost_actual=labor_hours,
+            labor_hours_actual=labor_cost,
+        ),
+        True,
+    )
 
 
 def _candidate_priority(message: NightlyEmailMessage) -> tuple[int, datetime]:
@@ -334,6 +343,10 @@ def backfill_nightly_emails(
                 warnings.append("amended_from_reply")
             else:
                 skipped.append(message.message_id)
+
+        report, labor_swapped = _repair_obvious_labor_swap(report)
+        if labor_swapped:
+            warnings.append("labor_hours_probably_swapped")
 
         entries.append(
             BackfillEntry(
