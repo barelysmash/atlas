@@ -71,7 +71,12 @@ def _narrative_total(text: str) -> int | None:
 
 
 def _structured_total(text: str) -> int | None:
-    return _first_number(text, (r"Total",))
+    match = re.search(
+        rf"\bTotal\s*:?\s*\$?\s*{_NUMBER}",
+        text,
+        re.IGNORECASE,
+    )
+    return _int(match.group(1)) if match else None
 
 
 def _comp_section(text: str) -> str:
