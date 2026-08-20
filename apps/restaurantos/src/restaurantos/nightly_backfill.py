@@ -9,7 +9,10 @@ _SUBJECT_DATE = re.compile(
     r"(?<!\d)(?P<month>\d{1,2})[./-](?P<day>\d{1,2})"
     r"(?:[./-](?P<year>\d{2,4}))?(?!\d)"
 )
-_QUOTED_REPLY = re.compile(r"^On .+ wrote:\s*$", re.IGNORECASE | re.MULTILINE)
+_QUOTED_REPLY = re.compile(
+    r"^On .*?wrote:\s*$",
+    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+)
 _FORWARDED = re.compile(
     r"^-{2,}\s*Forwarded message\s*-{2,}\s*$",
     re.IGNORECASE | re.MULTILINE,
