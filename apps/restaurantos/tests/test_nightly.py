@@ -1,8 +1,8 @@
 from datetime import date
 
 import pytest
-
 from atlas_core.derived_metric_engine import derive_metrics
+
 from restaurantos.metrics import NIGHTLY_DERIVED_METRICS
 from restaurantos.nightly import (
     CompLine,
