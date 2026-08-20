@@ -121,3 +121,20 @@ def test_missing_total_uses_rooms_and_preserves_narrative_ambiguity():
     assert report.narrative_total_covers == 235
     assert "narrative_total_mismatch" in report.quality_flags
     assert len(report.feature_sales) == 4
+
+
+def test_cover_counts_parse_when_source_formats_them_as_currency():
+    report = parse_nightly_email(
+        """
+        Reservations: $ 240.00
+        Dining Room: $ 263.00
+        Bar / Atrium: $
+        126.00 Total: $ 389.00
+        """,
+        service_date=date(2026, 7, 1),
+    )
+
+    assert report.reservation_covers == 240
+    assert report.dining_room_covers == 263
+    assert report.bar_atrium_covers == 126
+    assert report.total_covers == 389
