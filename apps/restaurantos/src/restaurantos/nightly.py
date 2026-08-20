@@ -274,7 +274,7 @@ def normalize_nightly_report(
             )
         )
     if total_covers is not None:
-        total_dimensions = {
+        total_dimensions: dict[str, object] = {
             "derived_from_rooms": (
                 report.total_covers is None and report.room_total_covers is not None
             )
