@@ -121,9 +121,7 @@ def test_room_mismatch_is_flagged_but_not_rejected():
 
     assert "room_total_mismatch" in report.quality_flags
     records = normalize_nightly_report(report)
-    guest_count = next(
-        record for record in records if record.metric == "guest_count"
-    )
+    guest_count = next(record for record in records if record.metric == "guest_count")
     assert "room_total_mismatch" in guest_count.dimensions["quality_flags"]
 
 
