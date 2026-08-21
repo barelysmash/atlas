@@ -97,21 +97,24 @@ def block_records(records: list[OperationalRecord]) -> list[OperationalRecord]:
     week against another rather than one night against the night before, which
     at a restaurant compares a Saturday with a Friday.
 
+    Each entity is blocked independently. One venue's trading calendar cannot
+    change another venue's inferred week length or be summed into its totals.
+
     Grains that already compare one period at a time pass through untouched.
     """
-    grouped: dict[str, list[OperationalRecord]] = {}
+    grouped: dict[tuple[str, str], list[OperationalRecord]] = {}
 
     for record in records:
-        grouped.setdefault(record.metric, []).append(record)
+        grouped.setdefault((record.entity, record.metric), []).append(record)
 
     blocked: list[OperationalRecord] = []
 
-    for metric, window in grouped.items():
+    for (entity, metric), window in grouped.items():
         grains = {record.grain for record in window}
 
         if len(grains) > 1:
             raise ValueError(
-                f"{metric} mixes grains {sorted(grains)}; a metric must be "
+                f"{entity} {metric} mixes grains {sorted(grains)}; a metric must be "
                 "reported at one grain"
             )
 
