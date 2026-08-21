@@ -162,34 +162,73 @@ def _parse_primary(message: _DatedMessage, restaurant: str) -> NightlyReport:
 
 
 def _merge_report(base: NightlyReport, amendment: NightlyReport) -> NightlyReport:
-    updates: dict[str, object] = {}
-    scalar_fields = (
-        "net_sales",
-        "reported_splh",
-        "labor_cost_actual",
-        "labor_cost_scheduled",
-        "labor_hours_actual",
-        "labor_hours_scheduled",
-        "reservation_covers",
-        "dining_room_covers",
-        "bar_atrium_covers",
-        "total_covers",
-        "narrative_total_covers",
-        "reported_total_comps",
-        "voids",
-        "void_count",
+    return replace(
+        base,
+        net_sales=(amendment.net_sales if amendment.net_sales is not None else base.net_sales),
+        reported_splh=(
+            amendment.reported_splh
+            if amendment.reported_splh is not None
+            else base.reported_splh
+        ),
+        labor_cost_actual=(
+            amendment.labor_cost_actual
+            if amendment.labor_cost_actual is not None
+            else base.labor_cost_actual
+        ),
+        labor_cost_scheduled=(
+            amendment.labor_cost_scheduled
+            if amendment.labor_cost_scheduled is not None
+            else base.labor_cost_scheduled
+        ),
+        labor_hours_actual=(
+            amendment.labor_hours_actual
+            if amendment.labor_hours_actual is not None
+            else base.labor_hours_actual
+        ),
+        labor_hours_scheduled=(
+            amendment.labor_hours_scheduled
+            if amendment.labor_hours_scheduled is not None
+            else base.labor_hours_scheduled
+        ),
+        reservation_covers=(
+            amendment.reservation_covers
+            if amendment.reservation_covers is not None
+            else base.reservation_covers
+        ),
+        dining_room_covers=(
+            amendment.dining_room_covers
+            if amendment.dining_room_covers is not None
+            else base.dining_room_covers
+        ),
+        bar_atrium_covers=(
+            amendment.bar_atrium_covers
+            if amendment.bar_atrium_covers is not None
+            else base.bar_atrium_covers
+        ),
+        total_covers=(
+            amendment.total_covers
+            if amendment.total_covers is not None
+            else base.total_covers
+        ),
+        narrative_total_covers=(
+            amendment.narrative_total_covers
+            if amendment.narrative_total_covers is not None
+            else base.narrative_total_covers
+        ),
+        reported_total_comps=(
+            amendment.reported_total_comps
+            if amendment.reported_total_comps is not None
+            else base.reported_total_comps
+        ),
+        voids=amendment.voids if amendment.voids is not None else base.voids,
+        void_count=(
+            amendment.void_count if amendment.void_count is not None else base.void_count
+        ),
+        comps=amendment.comps if amendment.comps else base.comps,
+        feature_sales=(
+            amendment.feature_sales if amendment.feature_sales else base.feature_sales
+        ),
     )
-    for field in scalar_fields:
-        value = getattr(amendment, field)
-        if value is not None:
-            updates[field] = value
-
-    if amendment.comps:
-        updates["comps"] = amendment.comps
-    if amendment.feature_sales:
-        updates["feature_sales"] = amendment.feature_sales
-
-    return replace(base, **updates)
 
 
 def _apply_compact_cover_amendment(
@@ -268,9 +307,13 @@ def backfill_nightly_emails(
             skipped.append(message.message_id)
             continue
 
-        service_date, warnings = infer_service_date(message.subject, message.sent_at)
+        service_date, date_warnings = infer_service_date(message.subject, message.sent_at)
         groups.setdefault(service_date, []).append(
-            _DatedMessage(message=message, service_date=service_date, warnings=warnings)
+            _DatedMessage(
+                message=message,
+                service_date=service_date,
+                warnings=date_warnings,
+            )
         )
 
     entries: list[BackfillEntry] = []
@@ -296,10 +339,10 @@ def backfill_nightly_emails(
             item for item in primaries if not _is_forward(item.message.subject)
         ]
         primary = direct_primaries[0] if direct_primaries else primaries[0]
-        warnings = list(primary.warnings)
+        entry_warnings: list[str] = list(primary.warnings)
 
         if len(direct_primaries) > 1:
-            warnings.append("multiple_primary_reports")
+            entry_warnings.append("multiple_primary_reports")
             reviews.append(
                 BackfillReview(
                     service_date=service_date,
@@ -342,20 +385,20 @@ def backfill_nightly_emails(
                     skipped.append(message.message_id)
                     continue
                 source_ids.append(message.message_id)
-                warnings.extend(item.warnings)
-                warnings.append("amended_from_reply")
+                entry_warnings.extend(item.warnings)
+                entry_warnings.append("amended_from_reply")
             else:
                 skipped.append(message.message_id)
 
         report, labor_swapped = _repair_obvious_labor_swap(report)
         if labor_swapped:
-            warnings.append("labor_hours_probably_swapped")
+            entry_warnings.append("labor_hours_probably_swapped")
 
         entries.append(
             BackfillEntry(
                 report=report,
                 source_message_ids=tuple(source_ids),
-                warnings=tuple(dict.fromkeys(warnings)),
+                warnings=tuple(dict.fromkeys(entry_warnings)),
             )
         )
 
