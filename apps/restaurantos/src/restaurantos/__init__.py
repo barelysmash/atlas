@@ -31,6 +31,10 @@ from restaurantos.operating_brief import (
     percentage_change,
     summarize_operating_period,
 )
+from restaurantos.operating_brief_runner import (
+    operating_brief_from_history,
+    write_operating_brief,
+)
 from restaurantos.tabc_importer import (
     TABCRecord,
     import_tabc_csv,
@@ -60,10 +64,12 @@ __all__ = [
     "morning_brief",
     "normalize_nightly_report",
     "normalize_tabc_records",
+    "operating_brief_from_history",
     "parse_nightly_email",
     "percentage_change",
     "read_history_jsonl",
     "summarize_operating_period",
     "write_history_jsonl",
     "write_history_manifest",
+    "write_operating_brief",
 ]
