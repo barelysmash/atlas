@@ -26,6 +26,35 @@ class GmailNightlyRefreshResult:
     refresh: NightlyRefreshResult
 
 
+def _validate_private_paths(
+    credentials_path: str | Path,
+    messages_path: str | Path,
+    state_path: str | Path,
+    history_path: str | Path,
+    manifest_path: str | Path,
+    overrides_path: str | Path | None,
+    brief_path: str | Path | None,
+) -> None:
+    named_paths: list[tuple[str, Path]] = [
+        ("credentials", Path(credentials_path).resolve()),
+        ("messages", Path(messages_path).resolve()),
+        ("state", Path(state_path).resolve()),
+        ("history", Path(history_path).resolve()),
+        ("manifest", Path(manifest_path).resolve()),
+    ]
+    if overrides_path is not None:
+        named_paths.append(("overrides", Path(overrides_path).resolve()))
+    if brief_path is not None:
+        named_paths.append(("brief", Path(brief_path).resolve()))
+
+    seen: dict[Path, str] = {}
+    for name, path in named_paths:
+        previous = seen.get(path)
+        if previous is not None:
+            raise ValueError(f"{previous} and {name} paths must be distinct")
+        seen[path] = name
+
+
 def gmail_nightly_refresh(
     credentials_path: str | Path,
     messages_path: str | Path,
@@ -44,6 +73,15 @@ def gmail_nightly_refresh(
     """Sync private Gmail EOD source and deterministically rebuild history."""
     if lookback_days < 0:
         raise ValueError("Gmail lookback days cannot be negative")
+    _validate_private_paths(
+        credentials_path,
+        messages_path,
+        state_path,
+        history_path,
+        manifest_path,
+        overrides_path,
+        brief_path,
+    )
 
     credentials = GmailOAuthCredentials.from_file(credentials_path)
     mailbox = GmailApiMailbox(
