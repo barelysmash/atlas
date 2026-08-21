@@ -37,6 +37,9 @@ jobs:
       - name: Ruff format
         run: ruff format --check .
 
+      - name: Bash syntax
+        run: bash -n deploy/*.sh
+
       - name: mypy
         run: |
           mypy packages/atlas-core/src/atlas_core \
