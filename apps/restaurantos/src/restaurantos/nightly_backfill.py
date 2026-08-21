@@ -1,4 +1,5 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 
@@ -147,9 +148,12 @@ def _looks_like_reaction(text: str) -> bool:
     return "reacted via gmail" in lowered and not _OPERATIONAL_LABEL.search(text)
 
 
+def _has_operational_data(text: str) -> bool:
+    return bool(_OPERATIONAL_LABEL.search(text) or _COMPACT_COVERS.search(text))
+
+
 def _has_amendment_data(message: NightlyEmailMessage) -> bool:
-    head = _reply_head(message.body)
-    return bool(_OPERATIONAL_LABEL.search(head) or _COMPACT_COVERS.search(head))
+    return _has_operational_data(_reply_head(message.body))
 
 
 def _parse_primary(message: _DatedMessage, restaurant: str) -> NightlyReport:
@@ -288,6 +292,29 @@ def _repair_obvious_labor_swap(report: NightlyReport) -> tuple[NightlyReport, bo
     )
 
 
+def _repair_obvious_room_total_swap(
+    report: NightlyReport,
+) -> tuple[NightlyReport, bool]:
+    dining_room = report.dining_room_covers
+    bar_atrium = report.bar_atrium_covers
+    total = report.total_covers
+    if dining_room is None or bar_atrium is None or total is None:
+        return report, False
+    if dining_room + bar_atrium == total:
+        return report, False
+    if dining_room + total != bar_atrium:
+        return report, False
+
+    return (
+        replace(
+            report,
+            bar_atrium_covers=total,
+            total_covers=bar_atrium,
+        ),
+        True,
+    )
+
+
 def _candidate_priority(message: NightlyEmailMessage) -> tuple[int, datetime]:
     if _is_reply(message.subject):
         return (0, message.sent_at)
@@ -300,21 +327,29 @@ def backfill_nightly_emails(
     messages: list[NightlyEmailMessage] | tuple[NightlyEmailMessage, ...],
     *,
     restaurant: str = "Fonda San Miguel",
+    service_date_overrides: Mapping[str, date] | None = None,
 ) -> BackfillResult:
     """Reconcile EOD messages into one normalized report per service date."""
     groups: dict[date, list[_DatedMessage]] = {}
     skipped: list[str] = []
     reviews: list[BackfillReview] = []
+    overrides = service_date_overrides or {}
 
     for message in messages:
-        if _looks_like_reaction(_reply_head(message.body)):
+        head = _reply_head(message.body)
+        if _looks_like_reaction(head) or not _has_operational_data(message.body):
             skipped.append(message.message_id)
             continue
 
-        service_date, date_warnings = infer_service_date(
-            message.subject,
-            message.sent_at,
-        )
+        date_warnings: tuple[str, ...]
+        if message.message_id in overrides:
+            service_date = overrides[message.message_id]
+            date_warnings = ("service_date_overridden",)
+        else:
+            service_date, date_warnings = infer_service_date(
+                message.subject,
+                message.sent_at,
+            )
         groups.setdefault(service_date, []).append(
             _DatedMessage(
                 message=message,
@@ -400,6 +435,10 @@ def backfill_nightly_emails(
         report, labor_swapped = _repair_obvious_labor_swap(report)
         if labor_swapped:
             entry_warnings.append("labor_hours_probably_swapped")
+
+        report, room_total_swapped = _repair_obvious_room_total_swap(report)
+        if room_total_swapped:
+            entry_warnings.append("bar_atrium_total_probably_swapped")
 
         entries.append(
             BackfillEntry(
