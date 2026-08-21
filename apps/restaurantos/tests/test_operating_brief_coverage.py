@@ -1,7 +1,6 @@
 from datetime import date
 
 from atlas_core.operational_record import OperationalRecord
-
 from restaurantos.operating_brief import (
     generate_operating_brief,
     summarize_operating_period,
