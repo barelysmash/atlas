@@ -81,10 +81,17 @@ class NightlyReport:
             if value is not None and value < 0:
                 raise ValueError(f"{name} cannot be negative")
 
+        validation_total = self.effective_total_covers
+        room_total = self.room_total_covers
+        if room_total is not None and (
+            validation_total is None or room_total > validation_total
+        ):
+            validation_total = room_total
+
         if (
             self.reservation_covers is not None
-            and self.effective_total_covers is not None
-            and self.reservation_covers > self.effective_total_covers
+            and validation_total is not None
+            and self.reservation_covers > validation_total
         ):
             raise ValueError("reservation_covers cannot exceed total covers")
 
