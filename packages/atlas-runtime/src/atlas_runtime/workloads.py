@@ -68,8 +68,8 @@ class WorkloadSpec:
                 relative.startswith(f"{directory}/") for directory in self.data_dirs
             ):
                 raise ValueError(
-                    "required private file must live beneath a declared data directory: "
-                    f"{relative!r}"
+                    "required private file must live beneath a declared "
+                    f"data directory: {relative!r}"
                 )
 
         for service in self.services:
@@ -122,12 +122,20 @@ class WorkloadRegistry:
     @property
     def data_dirs(self) -> tuple[str, ...]:
         return tuple(
-            sorted({directory for workload in self.workloads for directory in workload.data_dirs})
+            sorted(
+                {
+                    directory
+                    for workload in self.workloads
+                    for directory in workload.data_dirs
+                }
+            )
         )
 
     @property
     def services(self) -> tuple[str, ...]:
-        return tuple(service for workload in self.workloads for service in workload.services)
+        return tuple(
+            service for workload in self.workloads for service in workload.services
+        )
 
     @property
     def timers(self) -> tuple[str, ...]:
