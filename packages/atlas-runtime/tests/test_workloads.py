@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from atlas_runtime.workloads import WorkloadRegistry, WorkloadSpec, load_workload_registry
+from atlas_runtime.workloads import (
+    WorkloadRegistry,
+    WorkloadSpec,
+    load_workload_registry,
+)
 
 
 def _manifest(path: Path, content: str) -> Path:
@@ -94,7 +98,7 @@ def test_workload_requires_private_files_under_declared_data_dirs():
 
 
 def test_workload_rejects_invalid_units_and_autostart_membership():
-    with pytest.raises(ValueError, match="expected Atlas .service"):
+    with pytest.raises(ValueError, match=r"expected Atlas \.service"):
         WorkloadSpec(workload_id="bad", services=("worker.service",))
 
     with pytest.raises(ValueError, match="also be declared"):
