@@ -341,6 +341,7 @@ def backfill_nightly_emails(
             skipped.append(message.message_id)
             continue
 
+        date_warnings: tuple[str, ...]
         if message.message_id in overrides:
             service_date = overrides[message.message_id]
             date_warnings = ("service_date_overridden",)
