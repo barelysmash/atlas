@@ -3,7 +3,6 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-
 from restaurantos.operating_brief_runner import (
     operating_brief_from_history,
     write_operating_brief,
