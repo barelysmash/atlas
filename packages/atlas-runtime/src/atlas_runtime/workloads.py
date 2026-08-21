@@ -78,8 +78,7 @@ class WorkloadSpec:
             _validate_unit(service, suffix=".service")
             if service not in self.services:
                 raise ValueError(
-                    "autostart service must also be declared in services: "
-                    f"{service!r}"
+                    f"autostart service must also be declared in services: {service!r}"
                 )
         for timer in self.timers:
             _validate_unit(timer, suffix=".timer")
