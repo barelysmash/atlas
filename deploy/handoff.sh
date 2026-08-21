@@ -32,12 +32,10 @@ sudo tar -xzf "${GUILD_STAGING}/${RELEASE_NAME}.tar.gz" \
     -C "${RELEASE_PATH}" --strip-components=1
 sudo chown -R "${TARGET_USER}:${TARGET_USER}" "${RELEASE_PATH}"
 
-sudo -u "${TARGET_USER}" -H bash -c '
-    export XDG_RUNTIME_DIR=/run/user/$(id -u)
-    export DBUS_SESSION_BUS_ADDRESS=unix:path=${XDG_RUNTIME_DIR}/bus
-    cd "${RELEASE_PATH}"
-    bash deploy/remote_install.sh "${RELEASE_NAME}"
-'
+sudo -u "${TARGET_USER}" -H env \
+    XDG_RUNTIME_DIR="/run/user/\$(id -u "${TARGET_USER}")" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/\$(id -u "${TARGET_USER}")/bus" \
+    bash -c 'cd "${RELEASE_PATH}" && bash deploy/remote_install.sh "${RELEASE_NAME}"'
 
 rm -rf "${GUILD_STAGING}"
 REMOTE_SCRIPT
