@@ -22,7 +22,7 @@ class AccessTokenProvider(Protocol):
 
 
 def _request_json(request: Request) -> dict[str, Any]:
-    with urlopen(request, timeout=30) as response:  # noqa: S310 - HTTPS validated
+    with urlopen(request, timeout=30) as response:
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("expected JSON object from Gmail API")
@@ -84,7 +84,9 @@ class GmailOAuthTokenProvider:
         payload = self.request_json(request)
         token = payload.get("access_token")
         if not isinstance(token, str) or not token:
-            raise ValueError("Gmail OAuth refresh response did not include access_token")
+            raise ValueError(
+                "Gmail OAuth refresh response did not include access_token"
+            )
         return token
 
 
