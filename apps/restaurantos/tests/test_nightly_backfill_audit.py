@@ -73,7 +73,15 @@ def test_override_separates_two_reports_with_same_subject_date():
         date(2026, 7, 14),
         date(2026, 7, 15),
     ]
-    assert result.review == ()
+    expected_reasons = (
+        "missing_labor_cost_actual",
+        "missing_labor_hours_actual",
+        "missing_reservation_covers",
+    )
+    assert [(review.service_date, review.reasons) for review in result.review] == [
+        (date(2026, 7, 14), expected_reasons),
+        (date(2026, 7, 15), expected_reasons),
+    ]
 
 
 def test_deterministic_bar_atrium_total_transposition_is_repaired():
