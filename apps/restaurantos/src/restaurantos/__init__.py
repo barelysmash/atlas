@@ -64,11 +64,11 @@ from restaurantos.tabc_importer import (
 )
 
 __all__ = [
+    "DEFAULT_GMAIL_NIGHTLY_QUERY",
     "BackfillEntry",
     "BackfillResult",
     "BackfillReview",
     "CompLine",
-    "DEFAULT_GMAIL_NIGHTLY_QUERY",
     "FeatureSale",
     "GmailApiMailbox",
     "GmailNightlyRefreshResult",
