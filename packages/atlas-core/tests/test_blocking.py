@@ -10,10 +10,11 @@ def make_record(
     value: float,
     grain: str = "daily",
     aggregation: str = "sum",
+    entity: str = "Fonda San Miguel",
 ) -> OperationalRecord:
     return OperationalRecord.create(
         source="pos",
-        entity="Fonda San Miguel",
+        entity=entity,
         period=period,
         category="sales",
         metric=metric,
@@ -65,6 +66,18 @@ def test_summed_metrics_are_totalled_across_the_week():
     blocked = block_records(run(7))
 
     assert blocked[0].value == 700.0
+
+
+def test_entities_are_blocked_independently():
+    records = [
+        *run(7, value=100.0, entity="Fonda San Miguel"),
+        *run(7, value=50.0, entity="Tzintzuntzan"),
+    ]
+
+    blocked = block_records(records)
+    totals = {record.entity: record.value for record in blocked}
+
+    assert totals == {"Fonda San Miguel": 700.0, "Tzintzuntzan": 350.0}
 
 
 def test_averaged_metrics_are_meaned_across_the_week():
@@ -145,6 +158,30 @@ def test_a_metric_may_not_mix_grains():
 
     with pytest.raises(ValueError, match="mixes grains"):
         block_records(records)
+
+
+def test_same_metric_may_use_different_grains_for_different_entities():
+    records = [
+        make_record(
+            "2026-06-01",
+            "net_sales",
+            100.0,
+            grain="daily",
+            entity="Fonda San Miguel",
+        ),
+        make_record(
+            "2026-06",
+            "net_sales",
+            3000.0,
+            grain="monthly",
+            entity="Tzintzuntzan",
+        ),
+    ]
+
+    blocked = block_records(records)
+
+    assert len(blocked) == 2
+    assert {record.entity for record in blocked} == {"Fonda San Miguel", "Tzintzuntzan"}
 
 
 def test_a_daily_record_must_carry_a_date():

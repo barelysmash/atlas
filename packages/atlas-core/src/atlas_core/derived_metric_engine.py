@@ -8,11 +8,15 @@ from atlas_core.derived_metric import (
 from atlas_core.operational_record import OperationalRecord
 
 
-def _by_period(
+def _by_entity_period(
     records: list[OperationalRecord],
     metric: str,
-) -> dict[str, OperationalRecord]:
-    return {record.period: record for record in records if record.metric == metric}
+) -> dict[tuple[str, str], OperationalRecord]:
+    return {
+        (record.entity, record.period): record
+        for record in records
+        if record.metric == metric
+    }
 
 
 def _apply(definition: DerivedMetric, left: float, right: float) -> float | None:
@@ -36,6 +40,10 @@ def derive_metrics(
     another, so a margin can be derived from sales and cost and then divided
     by capacity in a later step.
 
+    Inputs are paired within an entity and period. A record from one venue can
+    never satisfy a missing component for another venue merely because both
+    occupy the same reporting period.
+
     A period missing either input produces nothing, and is reported downstream
     as a data gap rather than guessed at.
     """
@@ -44,11 +52,11 @@ def derive_metrics(
     derived = list(records)
 
     for definition in definitions:
-        lefts = _by_period(derived, definition.left)
-        rights = _by_period(derived, definition.right)
+        lefts = _by_entity_period(derived, definition.left)
+        rights = _by_entity_period(derived, definition.right)
 
-        for period in sorted(lefts.keys() & rights.keys()):
-            left, right = lefts[period], rights[period]
+        for entity_period in sorted(lefts.keys() & rights.keys()):
+            left, right = lefts[entity_period], rights[entity_period]
             value = _apply(definition, left.value, right.value)
 
             if value is None:
@@ -58,7 +66,7 @@ def derive_metrics(
                 OperationalRecord.create(
                     source=left.source,
                     entity=left.entity,
-                    period=period,
+                    period=left.period,
                     category=definition.category,
                     metric=definition.metric,
                     value=value,

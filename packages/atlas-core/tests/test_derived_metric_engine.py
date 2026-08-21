@@ -2,11 +2,15 @@ from atlas_core import OperationalRecord, block_records, derive_metrics
 
 
 def make_record(
-    period: str, metric: str, value: float, grain: str = "daily"
+    period: str,
+    metric: str,
+    value: float,
+    grain: str = "daily",
+    entity: str = "Fonda San Miguel",
 ) -> OperationalRecord:
     return OperationalRecord.create(
         source="pos",
-        entity="Fonda San Miguel",
+        entity=entity,
         period=period,
         category="labor",
         metric=metric,
@@ -49,6 +53,68 @@ def test_zero_denominator_derives_nothing():
     records = [
         make_record("2026-06", "net_sales", 30000.0, grain="monthly"),
         make_record("2026-06", "labor_hours", 0.0, grain="monthly"),
+    ]
+
+    assert [r for r in derive_metrics(records) if r.metric == "splh"] == []
+
+
+def test_entities_derive_independently_in_the_same_period():
+    records = [
+        make_record(
+            "2026-06",
+            "net_sales",
+            30000.0,
+            grain="monthly",
+            entity="Fonda San Miguel",
+        ),
+        make_record(
+            "2026-06",
+            "labor_hours",
+            1000.0,
+            grain="monthly",
+            entity="Fonda San Miguel",
+        ),
+        make_record(
+            "2026-06",
+            "net_sales",
+            12000.0,
+            grain="monthly",
+            entity="Tzintzuntzan",
+        ),
+        make_record(
+            "2026-06",
+            "labor_hours",
+            300.0,
+            grain="monthly",
+            entity="Tzintzuntzan",
+        ),
+    ]
+
+    splh = {
+        record.entity: record.value
+        for record in derive_metrics(records)
+        if record.metric == "splh"
+    }
+
+    assert splh == {"Fonda San Miguel": 30.0, "Tzintzuntzan": 40.0}
+
+
+def test_a_component_from_another_entity_cannot_fill_a_gap():
+    records = [
+        make_record(
+            "2026-06",
+            "net_sales",
+            30000.0,
+            grain="monthly",
+            entity="Fonda San Miguel",
+        ),
+        make_record(
+            "2026-06",
+            "labor_hours",
+            300.0,
+            grain="monthly",
+            entity="Tzintzuntzan",
+        ),
     ]
 
     assert [r for r in derive_metrics(records) if r.metric == "splh"] == []
