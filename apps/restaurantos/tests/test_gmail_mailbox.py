@@ -2,7 +2,9 @@ import base64
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request
 
@@ -11,6 +13,7 @@ from restaurantos.gmail_mailbox import (
     GmailApiMailbox,
     GmailOAuthCredentials,
     GmailOAuthTokenProvider,
+    _google_http_error,
 )
 
 
@@ -75,6 +78,33 @@ def test_oauth_token_provider_posts_refresh_grant():
         "refresh_token": ["refresh-token"],
         "grant_type": ["refresh_token"],
     }
+
+
+def test_gmail_api_error_includes_google_status_reason_and_message():
+    body = json.dumps(
+        {
+            "error": {
+                "code": 403,
+                "message": "Gmail API has not been used in project 123 before.",
+                "status": "PERMISSION_DENIED",
+                "errors": [{"reason": "accessNotConfigured"}],
+            }
+        }
+    ).encode("utf-8")
+    error = HTTPError(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        403,
+        "Forbidden",
+        hdrs=None,
+        fp=BytesIO(body),
+    )
+
+    rendered = _google_http_error(error)
+
+    assert str(rendered) == (
+        "Gmail API request failed (403 PERMISSION_DENIED; accessNotConfigured): "
+        "Gmail API has not been used in project 123 before."
+    )
 
 
 def test_gmail_mailbox_pages_search_and_extracts_plain_or_html_body():
