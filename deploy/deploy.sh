@@ -17,9 +17,13 @@ preflight() {
     [[ -f "${LOCAL_SOURCE}/pyproject.toml" ]] || fail "Atlas pyproject.toml not found"
     [[ -f "${LOCAL_SOURCE}/apps/restaurantos/pyproject.toml" ]] || \
         fail "RestaurantOS project not found"
-    command -v tar >/dev/null || fail "tar is required"
+    command -v git >/dev/null || fail "git is required"
+    command -v gzip >/dev/null || fail "gzip is required"
     command -v ssh >/dev/null || fail "ssh is required"
     command -v scp >/dev/null || fail "scp is required"
+
+    git -C "${LOCAL_SOURCE}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || \
+        fail "Atlas source is not a Git working tree"
 
     ssh -o ConnectTimeout=5 -o BatchMode=yes "${BASTION_HOST}" \
         "echo connected" >/dev/null 2>&1 || \
@@ -39,26 +43,13 @@ preflight() {
 }
 
 build_release() {
-    local exclude_args=(
-        --exclude='.git'
-        --exclude='.venv'
-        --exclude='venv'
-        --exclude='__pycache__'
-        --exclude='*.pyc'
-        --exclude='.pytest_cache'
-        --exclude='.coverage'
-        --exclude='*.egg-info'
-        --exclude='*.log'
-        --exclude='.env'
-        --exclude='deploy/.env'
-        --exclude='datasets/private'
-    )
-
-    tar -czf "${RELEASE_TARBALL}" \
-        "${exclude_args[@]}" \
-        -C "$(dirname "${LOCAL_SOURCE}")" \
-        "$(basename "${LOCAL_SOURCE}")"
-    log "Built ${RELEASE_TARBALL}"
+    # Archive exactly HEAD. Untracked or ignored local files can never enter a release.
+    git -C "${LOCAL_SOURCE}" archive \
+        --format=tar \
+        --prefix="${RELEASE_NAME}/" \
+        HEAD | gzip -c >"${RELEASE_TARBALL}"
+    [[ -s "${RELEASE_TARBALL}" ]] || fail "Release archive is empty"
+    log "Built tracked-files-only release ${RELEASE_TARBALL}"
 }
 
 ship_release() {
