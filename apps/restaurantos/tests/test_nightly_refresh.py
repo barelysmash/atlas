@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -119,13 +120,13 @@ def test_refresh_rebuilds_redacted_history_manifest_and_brief(tmp_path: Path):
         restaurant="Test Restaurant",
         brief_path=brief,
         brief_window=NightlyBriefWindow(
-            start_date=__import__("datetime").date(2026, 8, 20),
-            end_date=__import__("datetime").date(2026, 8, 20),
+            start_date=date(2026, 8, 20),
+            end_date=date(2026, 8, 20),
             label="August 20",
         ),
         compare_window=NightlyBriefWindow(
-            start_date=__import__("datetime").date(2026, 8, 19),
-            end_date=__import__("datetime").date(2026, 8, 19),
+            start_date=date(2026, 8, 19),
+            end_date=date(2026, 8, 19),
             label="August 19",
         ),
     )
