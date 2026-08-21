@@ -244,8 +244,8 @@ def _change_line(
     if current is None or previous is None:
         return f"- {label}: n/a"
     if percentage_points:
-        change = current - previous
-        return f"- {label}: {change:+.1f} pp"
+        delta = current - previous
+        return f"- {label}: {delta:+.1f} pp"
     change = percentage_change(current, previous)
     return f"- {label}: {'n/a' if change is None else f'{change:+.1f}%'}"
 
