@@ -4,7 +4,6 @@ from pathlib import Path
 
 from restaurantos.__main__ import main
 
-
 BODY = """
 SPLH: $90.00
 Labor (actual): $4,200.00
