@@ -29,6 +29,12 @@ _COMPACT_COVERS = re.compile(
     r"\bAtrium\s*:\s*(?P<atrium>\d+)\b",
     re.IGNORECASE | re.DOTALL,
 )
+_NARRATIVE_OPERATIONAL = re.compile(
+    r"\b(?:started[^\n.!?]{0,80}(?:covers?|on\s+the\s+books)|"
+    r"finished[^\n.!?]{0,80}(?:covers?|guests?)|"
+    r"seated[^\n.!?]{0,80}(?:covers?|guests?))\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +155,11 @@ def _looks_like_reaction(text: str) -> bool:
 
 
 def _has_operational_data(text: str) -> bool:
-    return bool(_OPERATIONAL_LABEL.search(text) or _COMPACT_COVERS.search(text))
+    return bool(
+        _OPERATIONAL_LABEL.search(text)
+        or _COMPACT_COVERS.search(text)
+        or _NARRATIVE_OPERATIONAL.search(text)
+    )
 
 
 def _has_amendment_data(message: NightlyEmailMessage) -> bool:
@@ -315,6 +325,21 @@ def _repair_obvious_room_total_swap(
     )
 
 
+def _completeness_reasons(report: NightlyReport) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if report.net_sales is None and report.reported_splh is None:
+        reasons.append("missing_sales_or_splh")
+    if report.labor_cost_actual is None:
+        reasons.append("missing_labor_cost_actual")
+    if report.labor_hours_actual is None:
+        reasons.append("missing_labor_hours_actual")
+    if report.reservation_covers is None:
+        reasons.append("missing_reservation_covers")
+    if report.effective_total_covers is None:
+        reasons.append("missing_total_covers")
+    return tuple(reasons)
+
+
 def _candidate_priority(message: NightlyEmailMessage) -> tuple[int, datetime]:
     if _is_reply(message.subject):
         return (0, message.sent_at)
@@ -439,6 +464,17 @@ def backfill_nightly_emails(
         report, room_total_swapped = _repair_obvious_room_total_swap(report)
         if room_total_swapped:
             entry_warnings.append("bar_atrium_total_probably_swapped")
+
+        completeness_reasons = _completeness_reasons(report)
+        if completeness_reasons:
+            entry_warnings.extend(completeness_reasons)
+            reviews.append(
+                BackfillReview(
+                    service_date=service_date,
+                    source_message_ids=tuple(source_ids),
+                    reasons=completeness_reasons,
+                )
+            )
 
         entries.append(
             BackfillEntry(
