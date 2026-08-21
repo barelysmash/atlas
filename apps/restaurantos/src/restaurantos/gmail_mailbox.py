@@ -11,6 +11,9 @@ from urllib.request import Request, urlopen
 
 from restaurantos.nightly_backfill import NightlyEmailMessage
 
+DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
+DEFAULT_GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1"
+
 JsonRequest = Callable[[Request], dict[str, Any]]
 
 
@@ -19,7 +22,7 @@ class AccessTokenProvider(Protocol):
 
 
 def _request_json(request: Request) -> dict[str, Any]:
-    with urlopen(request, timeout=30) as response:  # noqa: S310 - fixed HTTPS endpoints
+    with urlopen(request, timeout=30) as response:  # noqa: S310 - HTTPS validated
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("expected JSON object from Gmail API")
@@ -31,7 +34,7 @@ class GmailOAuthCredentials:
     client_id: str
     client_secret: str
     refresh_token: str
-    token_uri: str = "https://oauth2.googleapis.com/token"
+    token_uri: str = DEFAULT_TOKEN_URI
 
     @classmethod
     def from_file(cls, path: str | Path) -> "GmailOAuthCredentials":
@@ -47,7 +50,7 @@ class GmailOAuthCredentials:
                 raise ValueError(f"Gmail OAuth credentials require {key}")
             values[key] = value
 
-        token_uri = payload.get("token_uri", cls.token_uri)
+        token_uri = payload.get("token_uri", DEFAULT_TOKEN_URI)
         if not isinstance(token_uri, str) or not token_uri.startswith("https://"):
             raise ValueError("Gmail OAuth token_uri must be an HTTPS URL")
 
@@ -185,7 +188,7 @@ class GmailApiMailbox:
     token_provider: AccessTokenProvider
     query: str
     request_json: JsonRequest = _request_json
-    api_base: str = "https://gmail.googleapis.com/gmail/v1"
+    api_base: str = DEFAULT_GMAIL_API_BASE
     user_id: str = "me"
 
     def __post_init__(self) -> None:
@@ -194,7 +197,12 @@ class GmailApiMailbox:
         if not self.api_base.startswith("https://"):
             raise ValueError("Gmail API base must be an HTTPS URL")
 
-    def _get(self, path: str, token: str, params: dict[str, str] | None = None) -> dict[str, Any]:
+    def _get(
+        self,
+        path: str,
+        token: str,
+        params: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         suffix = f"?{urlencode(params)}" if params else ""
         request = Request(
             f"{self.api_base}/{path}{suffix}",
