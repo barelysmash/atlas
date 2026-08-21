@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from atlas_runtime.workloads import (
     WorkloadRegistry,
     WorkloadSpec,
