@@ -17,6 +17,14 @@ from restaurantos.nightly_backfill import (
     infer_service_date,
 )
 from restaurantos.nightly_email import parse_nightly_email
+from restaurantos.nightly_history import (
+    NightlyHistory,
+    NightlyHistoryManifest,
+    build_nightly_history,
+    read_history_jsonl,
+    write_history_jsonl,
+    write_history_manifest,
+)
 from restaurantos.tabc_importer import (
     TABCRecord,
     import_tabc_csv,
@@ -30,11 +38,14 @@ __all__ = [
     "CompLine",
     "FeatureSale",
     "NightlyEmailMessage",
+    "NightlyHistory",
+    "NightlyHistoryManifest",
     "NightlyReport",
     "OperationalRecord",
     "RestaurantRecord",
     "TABCRecord",
     "backfill_nightly_emails",
+    "build_nightly_history",
     "import_restaurant_csv",
     "import_tabc_csv",
     "infer_service_date",
@@ -42,4 +53,7 @@ __all__ = [
     "normalize_nightly_report",
     "normalize_tabc_records",
     "parse_nightly_email",
+    "read_history_jsonl",
+    "write_history_jsonl",
+    "write_history_manifest",
 ]
