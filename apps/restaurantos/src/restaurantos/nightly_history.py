@@ -35,8 +35,13 @@ def _record_sort_key(record: OperationalRecord) -> tuple[str, str, str, str]:
     return record.period, record.metric, record.category, dimensions
 
 
-def _manifest(result: BackfillResult, records: list[OperationalRecord]) -> NightlyHistoryManifest:
-    service_dates = sorted(entry.report.service_date.isoformat() for entry in result.entries)
+def _manifest(
+    result: BackfillResult,
+    records: list[OperationalRecord],
+) -> NightlyHistoryManifest:
+    service_dates = sorted(
+        entry.report.service_date.isoformat() for entry in result.entries
+    )
     warning_counts = Counter(
         warning for entry in result.entries for warning in entry.warnings
     )
