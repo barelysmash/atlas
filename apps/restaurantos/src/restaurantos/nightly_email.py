@@ -74,6 +74,7 @@ def _first_narrative_number(text: str, patterns: tuple[str, ...]) -> int | None:
 def _narrative_total(text: str) -> int | None:
     patterns = (
         r"finished seating\s+(\d+)\s+guests",
+        r"\bwe\s+seated\s+(\d+)\s+guests\b",
         r"finished with\s+(\d+)\s+covers",
         r"finishing the day with\s+(\d+)\s+covers",
         r"ended the night seating\s+(\d+)\s+in total",
