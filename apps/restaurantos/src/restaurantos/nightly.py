@@ -103,9 +103,20 @@ class NightlyReport:
 
     @property
     def effective_total_covers(self) -> int | None:
+        room_total = self.room_total_covers
+        narrative_total = self.narrative_total_covers
+
+        if (
+            room_total is not None
+            and narrative_total is not None
+            and room_total == narrative_total
+        ):
+            return room_total
         if self.total_covers is not None:
             return self.total_covers
-        return self.room_total_covers
+        if room_total is not None:
+            return room_total
+        return narrative_total
 
     @property
     def effective_net_sales(self) -> float | None:
