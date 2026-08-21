@@ -25,6 +25,13 @@ from restaurantos.nightly_history import (
     write_history_jsonl,
     write_history_manifest,
 )
+from restaurantos.nightly_refresh import (
+    NightlyBriefWindow,
+    NightlyRefreshResult,
+    read_nightly_message_jsonl,
+    read_service_date_overrides,
+    rebuild_nightly_history,
+)
 from restaurantos.operating_brief import (
     OperatingPeriodSummary,
     generate_operating_brief,
@@ -47,9 +54,11 @@ __all__ = [
     "BackfillReview",
     "CompLine",
     "FeatureSale",
+    "NightlyBriefWindow",
     "NightlyEmailMessage",
     "NightlyHistory",
     "NightlyHistoryManifest",
+    "NightlyRefreshResult",
     "NightlyReport",
     "OperatingPeriodSummary",
     "OperationalRecord",
@@ -68,6 +77,9 @@ __all__ = [
     "parse_nightly_email",
     "percentage_change",
     "read_history_jsonl",
+    "read_nightly_message_jsonl",
+    "read_service_date_overrides",
+    "rebuild_nightly_history",
     "summarize_operating_period",
     "write_history_jsonl",
     "write_history_manifest",
