@@ -1,6 +1,16 @@
 from atlas_core.operational_record import OperationalRecord
 
 from restaurantos.cli import morning_brief
+from restaurantos.gmail_mailbox import (
+    GmailApiMailbox,
+    GmailOAuthCredentials,
+    GmailOAuthTokenProvider,
+)
+from restaurantos.gmail_nightly_refresh import (
+    DEFAULT_GMAIL_NIGHTLY_QUERY,
+    GmailNightlyRefreshResult,
+    gmail_nightly_refresh,
+)
 from restaurantos.importer import RestaurantRecord, import_restaurant_csv
 from restaurantos.nightly import (
     CompLine,
@@ -24,6 +34,11 @@ from restaurantos.nightly_history import (
     read_history_jsonl,
     write_history_jsonl,
     write_history_manifest,
+)
+from restaurantos.nightly_mailbox import (
+    NightlyMailboxSource,
+    NightlyMailboxSyncResult,
+    sync_nightly_mailbox,
 )
 from restaurantos.nightly_refresh import (
     NightlyBriefWindow,
@@ -53,11 +68,18 @@ __all__ = [
     "BackfillResult",
     "BackfillReview",
     "CompLine",
+    "DEFAULT_GMAIL_NIGHTLY_QUERY",
     "FeatureSale",
+    "GmailApiMailbox",
+    "GmailNightlyRefreshResult",
+    "GmailOAuthCredentials",
+    "GmailOAuthTokenProvider",
     "NightlyBriefWindow",
     "NightlyEmailMessage",
     "NightlyHistory",
     "NightlyHistoryManifest",
+    "NightlyMailboxSource",
+    "NightlyMailboxSyncResult",
     "NightlyRefreshResult",
     "NightlyReport",
     "OperatingPeriodSummary",
@@ -67,6 +89,7 @@ __all__ = [
     "backfill_nightly_emails",
     "build_nightly_history",
     "generate_operating_brief",
+    "gmail_nightly_refresh",
     "import_restaurant_csv",
     "import_tabc_csv",
     "infer_service_date",
@@ -81,6 +104,7 @@ __all__ = [
     "read_service_date_overrides",
     "rebuild_nightly_history",
     "summarize_operating_period",
+    "sync_nightly_mailbox",
     "write_history_jsonl",
     "write_history_manifest",
     "write_operating_brief",
