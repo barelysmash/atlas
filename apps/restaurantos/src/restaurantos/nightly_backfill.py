@@ -164,7 +164,9 @@ def _parse_primary(message: _DatedMessage, restaurant: str) -> NightlyReport:
 def _merge_report(base: NightlyReport, amendment: NightlyReport) -> NightlyReport:
     return replace(
         base,
-        net_sales=(amendment.net_sales if amendment.net_sales is not None else base.net_sales),
+        net_sales=(
+            amendment.net_sales if amendment.net_sales is not None else base.net_sales
+        ),
         reported_splh=(
             amendment.reported_splh
             if amendment.reported_splh is not None
@@ -222,7 +224,9 @@ def _merge_report(base: NightlyReport, amendment: NightlyReport) -> NightlyRepor
         ),
         voids=amendment.voids if amendment.voids is not None else base.voids,
         void_count=(
-            amendment.void_count if amendment.void_count is not None else base.void_count
+            amendment.void_count
+            if amendment.void_count is not None
+            else base.void_count
         ),
         comps=amendment.comps if amendment.comps else base.comps,
         feature_sales=(
@@ -307,7 +311,10 @@ def backfill_nightly_emails(
             skipped.append(message.message_id)
             continue
 
-        service_date, date_warnings = infer_service_date(message.subject, message.sent_at)
+        service_date, date_warnings = infer_service_date(
+            message.subject,
+            message.sent_at,
+        )
         groups.setdefault(service_date, []).append(
             _DatedMessage(
                 message=message,
