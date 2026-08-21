@@ -15,8 +15,10 @@ fail() {
 
 preflight() {
     [[ -f "${LOCAL_SOURCE}/pyproject.toml" ]] || fail "Atlas pyproject.toml not found"
-    [[ -f "${LOCAL_SOURCE}/apps/restaurantos/pyproject.toml" ]] || \
-        fail "RestaurantOS project not found"
+    [[ -f "${LOCAL_SOURCE}/packages/atlas-runtime/pyproject.toml" ]] || \
+        fail "Atlas runtime package not found"
+    [[ -f "${LOCAL_SOURCE}/${WORKLOAD_MANIFEST_RELATIVE}" ]] || \
+        fail "Atlas workload manifest not found"
     command -v git >/dev/null || fail "git is required"
     command -v gzip >/dev/null || fail "gzip is required"
     command -v ssh >/dev/null || fail "ssh is required"
@@ -87,14 +89,11 @@ status() {
     ssh "${BASTION_HOST}" \
         "ssh ${TARGET_HOST} readlink -f '${TARGET_INSTALL}' || true"
 
-    log "RestaurantOS timer"
-    remote_user_systemctl "${uid}" status atlas-restaurantos-nightly.timer \
-        --no-pager || true
+    log "Atlas workload units"
+    remote_user_systemctl "${uid}" list-units 'atlas-*' --all --no-pager --plain || true
 
-    log "Last RestaurantOS service result"
-    remote_user_systemctl "${uid}" show atlas-restaurantos-nightly.service \
-        --property=Result --property=ExecMainStatus --property=ExecMainStartTimestamp \
-        --no-pager || true
+    log "Atlas workload timers"
+    remote_user_systemctl "${uid}" list-timers 'atlas-*' --all --no-pager --plain || true
 }
 
 logs() {
@@ -108,11 +107,16 @@ logs() {
          journalctl --user -u '${unit}' -n 100 -f"
 }
 
-run_restaurantos() {
+run_unit() {
+    local unit="${1:?Atlas service unit required}"
+    [[ "${unit}" == atlas-*.service ]] || fail "run requires an atlas-*.service unit"
+
     local uid
     uid=$(target_uid)
-    remote_user_systemctl "${uid}" start atlas-restaurantos-nightly.service
-    status
+    remote_user_systemctl "${uid}" start "${unit}"
+    remote_user_systemctl "${uid}" show "${unit}" \
+        --property=Result --property=ExecMainStatus --property=ActiveState \
+        --no-pager || true
 }
 
 rollback() {
@@ -135,8 +139,11 @@ main() {
         logs)
             logs "${2:-atlas-restaurantos-nightly.service}"
             ;;
+        run)
+            run_unit "${2:-}"
+            ;;
         run-restaurantos)
-            run_restaurantos
+            run_unit atlas-restaurantos-nightly.service
             ;;
         rollback)
             rollback
@@ -147,9 +154,10 @@ Usage: bash deploy/deploy.sh [command]
 
 Commands:
   deploy                 Build and deploy a new Atlas release
-  status                 Show current release and RestaurantOS timer state
-  logs [unit]            Follow systemd user logs
-  run-restaurantos       Run RestaurantOS refresh once now
+  status                 Show current release and all Atlas workload units
+  logs [unit]            Follow one Atlas systemd unit's journal
+  run <service>          Run one atlas-*.service unit now
+  run-restaurantos       Compatibility alias for RestaurantOS refresh
   rollback               Atomically switch to the previous release
 EOF
             exit 1

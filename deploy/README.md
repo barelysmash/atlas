@@ -15,6 +15,19 @@ Guildenstern. Runtime services run as the unprivileged `ocelia` user through
 Every release owns its own `.venv`. This keeps code and installed dependencies
 atomic: rollback switches both together.
 
+## Workload registry
+
+`deploy/workloads.toml` is the public host contract for Atlas workloads. Each
+workload declares its persistent data directories, required private readiness
+files, owned systemd services, autostart services, and timers.
+
+The registry contains paths and unit names only. It never contains credentials,
+Gmail content, account identifiers, operational records, or secret values.
+
+Deployment and rollback both reconcile systemd from the active release's
+registry. Ready workloads are started/restarted, blocked workloads are disabled,
+and Atlas units removed from the registry are retired.
+
 ## Privacy boundary
 
 Release archives are built with `git archive HEAD`, so only Git-tracked files
@@ -53,8 +66,9 @@ From the Atlas repository in Git Bash or another Bash shell:
 bash deploy/deploy.sh
 ```
 
-The first code deploy installs the RestaurantOS units. If private Gmail state
-has not been migrated yet, the timer is deliberately left disabled.
+A workload whose required private files do not exist is installed but left
+inactive. Once its private state exists, a later deploy/rollback reconciliation
+can activate it.
 
 ## Migrate private RestaurantOS state
 
@@ -70,8 +84,8 @@ The migration script:
 1. verifies the local private source bundle and OAuth token;
 2. streams only the required private files through the bastion to Guildenstern;
 3. applies owner-only permissions;
-4. enables the RestaurantOS timer; and
-5. runs one live refresh on Guildenstern as verification.
+4. runs one live refresh on Guildenstern and validates its service result; and
+5. enables the RestaurantOS timer only after that refresh succeeds.
 
 Do not copy the private files into this repository.
 
@@ -86,13 +100,13 @@ period.
 
 ```bash
 bash deploy/deploy.sh status
-bash deploy/deploy.sh run-restaurantos
+bash deploy/deploy.sh run atlas-restaurantos-nightly.service
 bash deploy/deploy.sh logs atlas-restaurantos-nightly.service
 bash deploy/deploy.sh rollback
 ```
 
-After Guildenstern has completed a verified live refresh, disable the old
-Windows scheduled task so there is one production writer.
+`run-restaurantos` remains as a compatibility alias for the generic `run`
+command.
 
 ## Extending Atlas
 
@@ -100,6 +114,9 @@ New Atlas subagents should follow the same boundary:
 
 - code and dependencies live inside immutable releases;
 - persistent state and credentials live under `~/atlas-data/<agent>/`;
-- long-running agents use systemd user services;
-- scheduled workflows use systemd user timers; and
+- the public workload contract is added to `deploy/workloads.toml`;
+- long-running agents declare autostart systemd user services;
+- scheduled workflows declare systemd user timers; and
 - deploys never package private runtime state.
+
+See `docs/adr/ADR-0002-guildenstern-workload-runtime.md` for the design decision.

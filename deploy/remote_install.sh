@@ -10,7 +10,8 @@ source "${SCRIPT_DIR}/deploy.config"
 RELEASE_NAME="${1:?Release name required}"
 RELEASE_PATH="${TARGET_RELEASES}/${RELEASE_NAME}"
 VENV_PATH="${RELEASE_PATH}/.venv"
-SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
+WORKLOAD_MANIFEST="${RELEASE_PATH}/${WORKLOAD_MANIFEST_RELATIVE}"
+WORKLOAD_TOOL="${RELEASE_PATH}/deploy/bin/workload_registry.py"
 
 if [[ ! -d "${RELEASE_PATH}" ]]; then
     echo "[install] Release not found: ${RELEASE_PATH}" >&2
@@ -36,17 +37,9 @@ if [[ ${#PROJECT_DIRS[@]} -eq 0 ]]; then
 fi
 
 "${VENV_PATH}/bin/python" -m pip install --no-cache-dir "${PROJECT_DIRS[@]}" --quiet
-"${VENV_PATH}/bin/python" -m restaurantos --help >/dev/null
+"${VENV_PATH}/bin/python" "${WORKLOAD_TOOL}" "${WORKLOAD_MANIFEST}" validate >/dev/null
 
-echo "[install] Runtime verified"
-
-# Persistent state is deliberately outside every release.
-mkdir -p \
-    "${TARGET_DATA}/google" \
-    "${TARGET_DATA}/restaurantos/fonda" \
-    "${TARGET_DATA}/logs"
-chmod 700 "${TARGET_DATA}" "${TARGET_DATA}/google" "${TARGET_DATA}/restaurantos"
-chmod 700 "${TARGET_DATA}/restaurantos/fonda" "${TARGET_DATA}/logs"
+echo "[install] Runtime and workload registry verified"
 
 # Atomic release switch. The previous release remains a complete rollback target,
 # including its own virtual environment.
@@ -57,38 +50,8 @@ fi
 ln -sfn "${RELEASE_PATH}" "${TARGET_INSTALL}"
 echo "[install] ${TARGET_INSTALL} -> ${RELEASE_PATH}"
 
-mkdir -p "${SYSTEMD_USER_DIR}"
-shopt -s nullglob
-for unit in "${RELEASE_PATH}/deploy/systemd"/*.service \
-            "${RELEASE_PATH}/deploy/systemd"/*.timer; do
-    cp "${unit}" "${SYSTEMD_USER_DIR}/"
-done
-shopt -u nullglob
-
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
-systemctl --user daemon-reload
-
-for service in "${SERVICES[@]}"; do
-    systemctl --user enable --now "${service}"
-done
-
-restaurantos_ready=false
-if [[ -s "${TARGET_DATA}/google/gmail-token.json" \
-      && -s "${TARGET_DATA}/restaurantos/fonda/nightly-messages.jsonl" ]]; then
-    restaurantos_ready=true
-fi
-
-for timer in "${TIMERS[@]}"; do
-    if [[ "${timer}" == "atlas-restaurantos-nightly.timer" \
-          && "${restaurantos_ready}" != true ]]; then
-        systemctl --user disable --now "${timer}" >/dev/null 2>&1 || true
-        echo "[install] ${timer} installed but disabled until private state is migrated"
-        continue
-    fi
-    systemctl --user enable --now "${timer}"
-    echo "[install] ${timer} enabled"
-done
+bash "${RELEASE_PATH}/deploy/reconcile_workloads.sh" \
+    "${RELEASE_PATH}" "${TARGET_DATA}"
 
 # Keep the current and previous releases naturally among the newest releases.
 cd "${TARGET_RELEASES}"

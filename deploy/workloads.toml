@@ -1,0 +1,15 @@
+[[workloads]]
+id = "restaurantos-nightly"
+data_dirs = [
+  "google",
+  "restaurantos",
+  "restaurantos/fonda",
+  "logs",
+]
+required_private_files = [
+  "google/gmail-token.json",
+  "restaurantos/fonda/nightly-messages.jsonl",
+]
+services = ["atlas-restaurantos-nightly.service"]
+autostart_services = []
+timers = ["atlas-restaurantos-nightly.timer"]
