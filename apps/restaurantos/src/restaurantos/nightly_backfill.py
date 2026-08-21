@@ -292,7 +292,9 @@ def _repair_obvious_labor_swap(report: NightlyReport) -> tuple[NightlyReport, bo
     )
 
 
-def _repair_obvious_room_total_swap(report: NightlyReport) -> tuple[NightlyReport, bool]:
+def _repair_obvious_room_total_swap(
+    report: NightlyReport,
+) -> tuple[NightlyReport, bool]:
     dining_room = report.dining_room_covers
     bar_atrium = report.bar_atrium_covers
     total = report.total_covers
