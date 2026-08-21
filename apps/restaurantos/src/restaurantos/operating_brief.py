@@ -35,6 +35,13 @@ class OperatingPeriodSummary:
     def nights_with(self, metric: str) -> int:
         return dict(self.coverage).get(metric, 0)
 
+    def per_night(self, metric: str) -> float | None:
+        total = self.total(metric)
+        nights = self.nights_with(metric)
+        if total is None or nights == 0:
+            return None
+        return total / nights
+
     def metric(self, metric: str) -> float | None:
         return dict(self.derived).get(metric)
 
@@ -150,13 +157,13 @@ def _derived_metrics(
         values["walk_in_covers"] = walk_ins
     coverage["walk_in_covers"] = nights
 
-    reservation = _metric_by_period(records, "reservation_covers")
+    reservations = _metric_by_period(records, "reservation_covers")
     guests = _metric_by_period(records, "guest_count")
-    shared = sorted(reservation.keys() & guests.keys())
+    shared = sorted(reservations.keys() & guests.keys())
     if shared:
         total_guests = sum(guests[period].value for period in shared)
         walk_ins = sum(
-            guests[period].value - reservation[period].value for period in shared
+            guests[period].value - reservations[period].value for period in shared
         )
         if total_guests:
             values["walk_in_share"] = walk_ins / total_guests * 100.0
@@ -243,6 +250,28 @@ def _change_line(
     return f"- {label}: {'n/a' if change is None else f'{change:+.1f}%'}"
 
 
+def _volume_change_line(
+    label: str,
+    metric: str,
+    current: OperatingPeriodSummary,
+    previous: OperatingPeriodSummary,
+) -> str:
+    current_nights = current.nights_with(metric)
+    previous_nights = previous.nights_with(metric)
+    if current_nights == previous_nights:
+        return _change_line(label, current.total(metric), previous.total(metric))
+
+    change = percentage_change(
+        current.per_night(metric),
+        previous.per_night(metric),
+    )
+    change_text = "n/a" if change is None else f"{change:+.1f}%"
+    return (
+        f"- {label} / covered night: {change_text} "
+        f"({current_nights} vs {previous_nights} nights)"
+    )
+
+
 def generate_operating_brief(
     current: OperatingPeriodSummary,
     previous: OperatingPeriodSummary | None = None,
@@ -251,6 +280,7 @@ def generate_operating_brief(
     sales = current.total("net_sales")
     covers = current.total("guest_count")
     labor = current.total("labor_cost")
+    labor_pct = _pct(current.metric("labor_cost_pct"))
 
     lines = [
         f"# {current.entity} Operating Brief",
@@ -261,7 +291,7 @@ def generate_operating_brief(
         f"- Covers: {_number(covers, 0)}",
         f"- Average check: {_money(current.metric('average_check'))}",
         f"- SPLH: {_money(current.metric('splh'))}",
-        f"- Labor cost: {_money(labor)} ({_pct(current.metric('labor_cost_pct'))})",
+        f"- Labor cost: {_money(labor)} ({labor_pct})",
         f"- Reservation share: {_pct(current.metric('reservation_share'))}",
         f"- Comp rate: {_pct(current.metric('comp_pct'))}",
         f"- Void rate: {_pct(current.metric('void_pct'))}",
@@ -282,16 +312,8 @@ def generate_operating_brief(
             [
                 "",
                 f"## vs {previous.label}",
-                _change_line(
-                    "Net sales",
-                    current.total("net_sales"),
-                    previous.total("net_sales"),
-                ),
-                _change_line(
-                    "Covers",
-                    current.total("guest_count"),
-                    previous.total("guest_count"),
-                ),
+                _volume_change_line("Net sales", "net_sales", current, previous),
+                _volume_change_line("Covers", "guest_count", current, previous),
                 _change_line(
                     "Average check",
                     current.metric("average_check"),
