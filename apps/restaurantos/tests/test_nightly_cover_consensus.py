@@ -4,9 +4,9 @@ from restaurantos.nightly import normalize_nightly_report
 from restaurantos.nightly_email import parse_nightly_email
 
 
-def _guest_count(report):
+def _guest_record(report):
     return next(
-        record.value
+        record
         for record in normalize_nightly_report(report)
         if record.metric == "guest_count"
     )
@@ -27,7 +27,7 @@ def test_concise_seated_guest_narrative_is_a_total_fallback():
     assert report.total_covers is None
     assert report.narrative_total_covers == 397
     assert report.effective_total_covers == 397
-    assert _guest_count(report) == 397
+    assert _guest_record(report).value == 397
 
 
 def test_room_and_narrative_consensus_wins_over_structured_mismatch():
@@ -48,7 +48,10 @@ def test_room_and_narrative_consensus_wins_over_structured_mismatch():
     assert report.effective_total_covers == 415
     assert "room_total_mismatch" in report.quality_flags
     assert "narrative_total_mismatch" not in report.quality_flags
-    assert _guest_count(report) == 415
+
+    guest = _guest_record(report)
+    assert guest.value == 415
+    assert guest.dimensions["derived_from_rooms"] is True
 
 
 def test_narrative_total_is_used_when_structured_and_room_totals_are_absent():
@@ -64,4 +67,4 @@ def test_narrative_total_is_used_when_structured_and_room_totals_are_absent():
     assert report.room_total_covers is None
     assert report.narrative_total_covers == 415
     assert report.effective_total_covers == 415
-    assert _guest_count(report) == 415
+    assert _guest_record(report).value == 415
