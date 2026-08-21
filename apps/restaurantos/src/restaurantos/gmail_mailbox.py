@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -21,9 +22,48 @@ class AccessTokenProvider(Protocol):
     def access_token(self) -> str: ...
 
 
+def _google_http_error(error: HTTPError) -> RuntimeError:
+    status = str(error.code)
+    detail = error.reason or "HTTP error"
+    reason: str | None = None
+
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        payload = None
+
+    if isinstance(payload, dict):
+        api_error = payload.get("error")
+        if isinstance(api_error, dict):
+            raw_status = api_error.get("status")
+            if isinstance(raw_status, str) and raw_status:
+                status = f"{error.code} {raw_status}"
+
+            raw_message = api_error.get("message")
+            if isinstance(raw_message, str) and raw_message:
+                detail = raw_message
+
+            errors = api_error.get("errors")
+            if isinstance(errors, list):
+                for item in errors:
+                    if not isinstance(item, dict):
+                        continue
+                    raw_reason = item.get("reason")
+                    if isinstance(raw_reason, str) and raw_reason:
+                        reason = raw_reason
+                        break
+
+    reason_text = f"; {reason}" if reason is not None else ""
+    return RuntimeError(f"Gmail API request failed ({status}{reason_text}): {detail}")
+
+
 def _request_json(request: Request) -> dict[str, Any]:
-    with urlopen(request, timeout=30) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raise _google_http_error(error) from error
+
     if not isinstance(payload, dict):
         raise ValueError("expected JSON object from Gmail API")
     return payload
