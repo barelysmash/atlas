@@ -118,6 +118,7 @@ def _narrative_covers(
             r"\bfor\s+a\s+total\s+of\s+(\d+)\s+guests?\s+served",
             r"\bin\s+total\s+we\s+seated\s+and\s+served\s+(\d+)\s+guests?",
             r"\bfinished\s+with\s+(\d+)\s+covers\s+(?:for|all)\s+(?:the\s+)?day",
+            r"\band\s+(\d+)\s+covers\s+for\s+the\s+day",
         ),
     )
     if total is None and dining_room is not None and bar_atrium is not None:
