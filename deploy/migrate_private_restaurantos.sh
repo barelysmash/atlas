@@ -58,11 +58,12 @@ cat "${SOURCE_TOKEN}" | \
         "ssh ${TARGET_HOST} \"sudo -u ${TARGET_USER} -H bash -c \
         'umask 077; cat > ${TARGET_GOOGLE}/gmail-token.json'\""
 
-# Apply owner-only permissions without relying on a remotely quoted wildcard.
+# Apply owner-only permissions as root. Running find as TARGET_USER would inherit
+# the SSH account's working directory, which TARGET_USER may not be able to traverse.
+# The files themselves were created above as TARGET_USER; chmod does not change owner.
 ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} \
-    \"sudo -u ${TARGET_USER} -H chmod 600 '${TARGET_GOOGLE}/gmail-token.json' && \
-    sudo -u ${TARGET_USER} -H find '${TARGET_FONDA}' -maxdepth 1 -type f \
-        -exec chmod 600 {} + && \
+    \"sudo chmod 600 '${TARGET_GOOGLE}/gmail-token.json' && \
+    sudo find '${TARGET_FONDA}' -maxdepth 1 -type f -exec chmod 600 {} + && \
     sudo -u ${TARGET_USER} -H test -s '${TARGET_GOOGLE}/gmail-token.json' && \
     sudo -u ${TARGET_USER} -H test -s '${TARGET_FONDA}/nightly-messages.jsonl'\""
 
