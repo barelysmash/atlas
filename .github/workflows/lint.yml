@@ -29,7 +29,7 @@ jobs:
           pip install ruff==0.16.1 mypy==2.3.0 pytest pytest-cov jsonschema
           pip install -e packages/atlas-core -e packages/atlas-events \
                       -e packages/atlas-memory -e packages/atlas-metrics \
-                      -e apps/restaurantos
+                      -e packages/atlas-runtime -e apps/restaurantos
 
       - name: Ruff check
         run: ruff check .
@@ -50,6 +50,8 @@ jobs:
           /tmp/atlas-release-venv/bin/python -m pip install --upgrade pip wheel
           /tmp/atlas-release-venv/bin/python -m pip install "${projects[@]}"
           /tmp/atlas-release-venv/bin/python -m restaurantos --help >/dev/null
+          /tmp/atlas-release-venv/bin/python deploy/bin/workload_registry.py \
+            deploy/workloads.toml validate
 
       - name: mypy
         run: |
@@ -57,4 +59,6 @@ jobs:
                packages/atlas-events/src/atlas_events \
                packages/atlas-memory/src/atlas_memory \
                packages/atlas-metrics/src/atlas_metrics \
-               apps/restaurantos/src/restaurantos
+               packages/atlas-runtime/src/atlas_runtime \
+               apps/restaurantos/src/restaurantos \
+               deploy/bin/workload_registry.py
