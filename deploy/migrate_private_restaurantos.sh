@@ -24,8 +24,12 @@ fail() {
 [[ -s "${SOURCE_FONDA}/nightly-messages.jsonl" ]] || \
     fail "Source nightly message bundle is missing"
 
-ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} test -L '${TARGET_INSTALL}'" || \
-    fail "Atlas must be deployed to ${TARGET_HOST} before private state migration"
+# The ordinary SSH account may not be able to traverse TARGET_USER's home.
+# Validate the deployed release as the service user that actually owns/runs Atlas.
+ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} \
+    \"sudo -u ${TARGET_USER} -H test -L '${TARGET_INSTALL}' && \
+    sudo -u ${TARGET_USER} -H test -x '${TARGET_INSTALL}/.venv/bin/python'\"" || \
+    fail "Atlas runtime is not installed for ${TARGET_USER} on ${TARGET_HOST}"
 
 ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} \
     \"sudo install -d -o ${TARGET_USER} -g ${TARGET_USER} -m 700 \
@@ -55,14 +59,15 @@ cat "${SOURCE_TOKEN}" | \
         'umask 077; cat > ${TARGET_GOOGLE}/gmail-token.json'\""
 
 ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} \
-    \"sudo -u ${TARGET_USER} -H chmod 600 '${TARGET_GOOGLE}/gmail-token.json' '${TARGET_FONDA}'/*\""
+    \"sudo -u ${TARGET_USER} -H chmod 600 '${TARGET_GOOGLE}/gmail-token.json' '${TARGET_FONDA}'/* && \
+    sudo -u ${TARGET_USER} -H test -s '${TARGET_GOOGLE}/gmail-token.json' && \
+    sudo -u ${TARGET_USER} -H test -s '${TARGET_FONDA}/nightly-messages.jsonl'\""
 
 TARGET_UID=$(ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} id -u ${TARGET_USER}")
 SYSTEMD_ENV="XDG_RUNTIME_DIR=/run/user/${TARGET_UID} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${TARGET_UID}/bus"
 
-ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
-    ${SYSTEMD_ENV} systemctl --user enable --now atlas-restaurantos-nightly.timer"
-
+# Verify a live refresh before enabling the persistent timer. This prevents an
+# overdue Persistent=true trigger from racing the first validation run.
 printf '[private-migrate] Running one live refresh on Guildenstern\n'
 if ! ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
     ${SYSTEMD_ENV} systemctl --user start atlas-restaurantos-nightly.service"; then
@@ -72,9 +77,23 @@ if ! ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
     fail "Guildenstern live refresh failed"
 fi
 
-ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
+SERVICE_STATUS=$(ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
     ${SYSTEMD_ENV} systemctl --user show atlas-restaurantos-nightly.service \
     --property=Result --property=ExecMainStatus --property=ExecMainStartTimestamp \
-    --no-pager"
+    --no-pager")
+printf '%s\n' "${SERVICE_STATUS}"
 
-printf '[private-migrate] Private state migrated and live refresh verified\n'
+if ! grep -qx 'Result=success' <<<"${SERVICE_STATUS}" || \
+   ! grep -qx 'ExecMainStatus=0' <<<"${SERVICE_STATUS}"; then
+    fail "Guildenstern refresh did not report a successful service result"
+fi
+
+printf '[private-migrate] Enabling RestaurantOS timer\n'
+ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
+    ${SYSTEMD_ENV} systemctl --user enable --now atlas-restaurantos-nightly.timer"
+
+ssh "${BASTION_HOST}" "ssh ${TARGET_HOST} sudo -u ${TARGET_USER} -H env \
+    ${SYSTEMD_ENV} systemctl --user is-active --quiet atlas-restaurantos-nightly.timer" || \
+    fail "RestaurantOS timer did not become active"
+
+printf '[private-migrate] Private state migrated, live refresh verified, timer active\n'
