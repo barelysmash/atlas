@@ -37,6 +37,20 @@ jobs:
       - name: Ruff format
         run: ruff format --check .
 
+      - name: Bash syntax
+        run: bash -n deploy/*.sh
+
+      - name: Release install smoke test
+        run: |
+          python -m venv /tmp/atlas-release-venv
+          mapfile -t projects < <(
+            find packages apps -mindepth 2 -maxdepth 2 \
+              -name pyproject.toml -printf '%h\n' | sort
+          )
+          /tmp/atlas-release-venv/bin/python -m pip install --upgrade pip wheel
+          /tmp/atlas-release-venv/bin/python -m pip install "${projects[@]}"
+          /tmp/atlas-release-venv/bin/python -m restaurantos --help >/dev/null
+
       - name: mypy
         run: |
           mypy packages/atlas-core/src/atlas_core \

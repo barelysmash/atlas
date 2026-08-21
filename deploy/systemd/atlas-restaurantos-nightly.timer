@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Atlas RestaurantOS Gmail nightly refresh
+
+[Timer]
+OnCalendar=*-*-* 05:30:00 America/Chicago
+OnCalendar=*-*-* 11:30:00 America/Chicago
+Persistent=true
+AccuracySec=1min
+Unit=atlas-restaurantos-nightly.service
+
+[Install]
+WantedBy=timers.target
