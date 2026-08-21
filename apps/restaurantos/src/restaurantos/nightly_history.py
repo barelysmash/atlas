@@ -90,9 +90,7 @@ def _serializable_dimensions(
     if include_source_message_ids:
         return dict(dimensions)
     return {
-        key: value
-        for key, value in dimensions.items()
-        if key != "source_message_id"
+        key: value for key, value in dimensions.items() if key != "source_message_id"
     }
 
 
