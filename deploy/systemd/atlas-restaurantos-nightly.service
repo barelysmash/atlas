@@ -8,7 +8,6 @@ Type=oneshot
 WorkingDirectory=%h/atlas
 ExecStart=%h/atlas/.venv/bin/python %h/atlas/deploy/bin/restaurantos_nightly.py
 Environment=PYTHONUNBUFFERED=1
-Environment=ATLAS_DATA_ROOT=%h/atlas-data
 Environment=ATLAS_TIMEZONE=America/Chicago
 UMask=0077
 TimeoutStartSec=15min
