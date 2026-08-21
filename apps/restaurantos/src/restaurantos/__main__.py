@@ -115,7 +115,7 @@ def main() -> None:
 
     if args.command == "nightly-refresh":
         brief_window, compare_window = _brief_windows(args, parser)
-        result = rebuild_nightly_history(
+        refresh_result = rebuild_nightly_history(
             args.messages,
             args.history,
             args.manifest,
@@ -125,18 +125,18 @@ def main() -> None:
             brief_window=brief_window,
             compare_window=compare_window,
         )
-        print(f"service_nights={result.service_nights}")
-        print(f"records={result.record_count}")
-        print(f"reviews={result.review_count}")
-        print(f"history={result.history_path}")
-        print(f"manifest={result.manifest_path}")
-        if result.brief_path is not None:
-            print(f"brief={result.brief_path}")
+        print(f"service_nights={refresh_result.service_nights}")
+        print(f"records={refresh_result.record_count}")
+        print(f"reviews={refresh_result.review_count}")
+        print(f"history={refresh_result.history_path}")
+        print(f"manifest={refresh_result.manifest_path}")
+        if refresh_result.brief_path is not None:
+            print(f"brief={refresh_result.brief_path}")
         return
 
     if args.command == "gmail-nightly-refresh":
         brief_window, compare_window = _brief_windows(args, parser)
-        result = gmail_nightly_refresh(
+        gmail_result = gmail_nightly_refresh(
             args.credentials,
             args.messages,
             args.state,
@@ -150,19 +150,19 @@ def main() -> None:
             brief_window=brief_window,
             compare_window=compare_window,
         )
-        print(f"fetched_messages={result.sync.fetched_message_count}")
-        print(f"new_messages={result.sync.new_message_count}")
-        print(f"updated_messages={result.sync.updated_message_count}")
-        print(f"bundle_messages={result.sync.bundle_message_count}")
-        print(f"service_nights={result.refresh.service_nights}")
-        print(f"records={result.refresh.record_count}")
-        print(f"reviews={result.refresh.review_count}")
-        print(f"messages={result.sync.bundle_path}")
-        print(f"state={result.sync.state_path}")
-        print(f"history={result.refresh.history_path}")
-        print(f"manifest={result.refresh.manifest_path}")
-        if result.refresh.brief_path is not None:
-            print(f"brief={result.refresh.brief_path}")
+        print(f"fetched_messages={gmail_result.sync.fetched_message_count}")
+        print(f"new_messages={gmail_result.sync.new_message_count}")
+        print(f"updated_messages={gmail_result.sync.updated_message_count}")
+        print(f"bundle_messages={gmail_result.sync.bundle_message_count}")
+        print(f"service_nights={gmail_result.refresh.service_nights}")
+        print(f"records={gmail_result.refresh.record_count}")
+        print(f"reviews={gmail_result.refresh.review_count}")
+        print(f"messages={gmail_result.sync.bundle_path}")
+        print(f"state={gmail_result.sync.state_path}")
+        print(f"history={gmail_result.refresh.history_path}")
+        print(f"manifest={gmail_result.refresh.manifest_path}")
+        if gmail_result.refresh.brief_path is not None:
+            print(f"brief={gmail_result.refresh.brief_path}")
         return
 
     brief = operating_brief_from_history(
