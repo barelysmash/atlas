@@ -3,14 +3,12 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-
 from restaurantos.nightly_refresh import (
     NightlyBriefWindow,
     read_nightly_message_jsonl,
     read_service_date_overrides,
     rebuild_nightly_history,
 )
-
 
 BODY_19 = """
 SPLH: $80.00
