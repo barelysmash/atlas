@@ -292,9 +292,12 @@ def normalize_nightly_report(
             )
         )
     if total_covers is not None:
+        room_total = report.room_total_covers
         total_dimensions: dict[str, object] = {
             "derived_from_rooms": (
-                report.total_covers is None and report.room_total_covers is not None
+                room_total is not None
+                and total_covers == room_total
+                and report.total_covers != total_covers
             )
         }
         records.append(
