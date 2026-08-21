@@ -25,6 +25,12 @@ from restaurantos.nightly_history import (
     write_history_jsonl,
     write_history_manifest,
 )
+from restaurantos.operating_brief import (
+    OperatingPeriodSummary,
+    generate_operating_brief,
+    percentage_change,
+    summarize_operating_period,
+)
 from restaurantos.tabc_importer import (
     TABCRecord,
     import_tabc_csv,
@@ -41,11 +47,13 @@ __all__ = [
     "NightlyHistory",
     "NightlyHistoryManifest",
     "NightlyReport",
+    "OperatingPeriodSummary",
     "OperationalRecord",
     "RestaurantRecord",
     "TABCRecord",
     "backfill_nightly_emails",
     "build_nightly_history",
+    "generate_operating_brief",
     "import_restaurant_csv",
     "import_tabc_csv",
     "infer_service_date",
@@ -53,7 +61,9 @@ __all__ = [
     "normalize_nightly_report",
     "normalize_tabc_records",
     "parse_nightly_email",
+    "percentage_change",
     "read_history_jsonl",
+    "summarize_operating_period",
     "write_history_jsonl",
     "write_history_manifest",
 ]
