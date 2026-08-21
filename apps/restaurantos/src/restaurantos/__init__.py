@@ -8,6 +8,14 @@ from restaurantos.nightly import (
     NightlyReport,
     normalize_nightly_report,
 )
+from restaurantos.nightly_backfill import (
+    BackfillEntry,
+    BackfillResult,
+    BackfillReview,
+    NightlyEmailMessage,
+    backfill_nightly_emails,
+    infer_service_date,
+)
 from restaurantos.nightly_email import parse_nightly_email
 from restaurantos.tabc_importer import (
     TABCRecord,
@@ -16,14 +24,20 @@ from restaurantos.tabc_importer import (
 )
 
 __all__ = [
+    "BackfillEntry",
+    "BackfillResult",
+    "BackfillReview",
     "CompLine",
     "FeatureSale",
+    "NightlyEmailMessage",
     "NightlyReport",
     "OperationalRecord",
     "RestaurantRecord",
     "TABCRecord",
+    "backfill_nightly_emails",
     "import_restaurant_csv",
     "import_tabc_csv",
+    "infer_service_date",
     "morning_brief",
     "normalize_nightly_report",
     "normalize_tabc_records",

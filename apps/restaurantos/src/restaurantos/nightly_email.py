@@ -29,7 +29,11 @@ def _first_money(text: str, labels: tuple[str, ...]) -> float | None:
 
 def _first_number(text: str, labels: tuple[str, ...]) -> int | None:
     for label in labels:
-        match = re.search(rf"{label}\s*:\s*{_NUMBER}", text, re.IGNORECASE)
+        match = re.search(
+            rf"{label}\s*:\s*\$?\s*{_NUMBER}",
+            text,
+            re.IGNORECASE,
+        )
         if match:
             return _int(match.group(1))
     return None
@@ -68,22 +72,11 @@ def _narrative_total(text: str) -> int | None:
 
 def _structured_total(text: str) -> int | None:
     match = re.search(
-        r"(?:^|\n)\s*Total\s*:\s*(\d+)\s*(?:\n|$)",
+        rf"\bTotal\s*:?\s*\$?\s*{_NUMBER}",
         text,
         re.IGNORECASE,
     )
-    if match:
-        return int(match.group(1))
-
-    match = re.search(
-        r"Bar\s*/?\s*Atrium\s*:\s*\d+\s+Total\s*:?[ ]*(\d+)",
-        text,
-        re.IGNORECASE,
-    )
-    if match:
-        return int(match.group(1))
-
-    return None
+    return _int(match.group(1)) if match else None
 
 
 def _comp_section(text: str) -> str:
