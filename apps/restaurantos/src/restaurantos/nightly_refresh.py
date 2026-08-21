@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
+from atlas_core.operational_record import OperationalRecord
+
 from restaurantos.nightly_backfill import NightlyEmailMessage, backfill_nightly_emails
 from restaurantos.nightly_history import (
     build_nightly_history,
@@ -139,7 +141,7 @@ def _validate_output_paths(
 
 
 def _render_brief(
-    records: list,
+    records: list[OperationalRecord],
     current: NightlyBriefWindow,
     compare: NightlyBriefWindow | None,
     restaurant: str,
