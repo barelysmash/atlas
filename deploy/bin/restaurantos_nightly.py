@@ -36,7 +36,6 @@ def main() -> int:
     overrides = restaurant_root / "service-date-overrides.json"
 
     _required_file(credentials, "Gmail OAuth credentials")
-    _required_file(messages, "private nightly message bundle")
     restaurant_root.mkdir(parents=True, exist_ok=True)
 
     local_today = datetime.now(ZoneInfo(timezone_name)).date()
@@ -60,6 +59,8 @@ def main() -> int:
         str(manifest),
         "--restaurant",
         restaurant,
+        "--query",
+        os.environ.get("ATLAS_GMAIL_QUERY", "{EOD SPLH} -in:trash -in:spam"),
         "--lookback-days",
         str(lookback_days),
         "--brief-output",
