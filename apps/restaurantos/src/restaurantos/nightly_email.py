@@ -80,6 +80,7 @@ def _narrative_total(text: str) -> int | None:
         r"ended the night seating\s+(\d+)\s+in total",
         r"ended the evening with\s+(\d+)\s+seated",
         r"ended the night with\s+(\d+)\s+(?:covers|guests)",
+        r"\bfinished\s+with\s+(\d+)\s+guests\s+all\s+day\b",
     )
     return _first_narrative_number(text, patterns)
 
