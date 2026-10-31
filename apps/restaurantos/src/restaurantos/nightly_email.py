@@ -67,7 +67,7 @@ def _first_narrative_number(text: str, patterns: tuple[str, ...]) -> int | None:
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
         if match:
-            return int(match.group(1))
+            return _int(match.group(1))
     return None
 
 
@@ -81,6 +81,10 @@ def _narrative_total(text: str) -> int | None:
         r"ended the evening with\s+(\d+)\s+seated",
         r"ended the night with\s+(\d+)\s+(?:covers|guests)",
         r"\bfinished\s+with\s+(\d+)\s+guests\s+all\s+day\b",
+        r"\bfinished\s+with\s+[\d,]+\s+guests?\s+in\s+(?:the\s+)?"
+        r"main\s+dining\s+room\s+and\s+([\d,]+)\s+all\s+day\s*,?\s+"
+        r"including\s+the\s+bar\s+and\s+(?:the\s+)?atrium\b",
+        r"\bbringing\s+us\s+to\s+([\d,]+)\s+guests?\s+all\s+day\b",
     )
     return _first_narrative_number(text, patterns)
 
