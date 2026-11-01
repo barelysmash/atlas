@@ -71,6 +71,24 @@ def _first_narrative_number(text: str, patterns: tuple[str, ...]) -> int | None:
     return None
 
 
+def _unquoted_primary_head(text: str) -> str:
+    """Match the quoted-reply boundaries in nightly_backfill._reply_head.
+
+    Only the newly accepted whitespace variant is restricted to this head.
+    Established cover patterns retain their existing parsing behavior.
+    """
+    reply = re.search(
+        r"^On .*?wrote:\s*$", text, re.IGNORECASE | re.MULTILINE | re.DOTALL
+    )
+    forwarded = re.search(
+        r"^-{2,}\s*Forwarded message\s*-{2,}\s*$",
+        text,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    boundaries = [match.start() for match in (reply, forwarded) if match]
+    return text[: min(boundaries)] if boundaries else text
+
+
 def _narrative_total(text: str) -> int | None:
     patterns = (
         r"finished seating\s+(\d+)\s+guests",
@@ -86,7 +104,18 @@ def _narrative_total(text: str) -> int | None:
         r"including\s+the\s+bar\s+and\s+(?:the\s+)?atrium\b",
         r"\bbringing\s+us\s+to\s+([\d,]+)\s+guests?\s+all\s+day\b",
     )
-    return _first_narrative_number(text, patterns)
+    existing_total = _first_narrative_number(text, patterns)
+    if existing_total is not None:
+        return existing_total
+    # The selected EOD primary sometimes wraps "finished seating" over lines.
+    # Apply the expanded separator only to the pre-reply portion of the email.
+    return _first_narrative_number(
+        _unquoted_primary_head(text),
+        (
+            r"\bfinished\s+seating\s+(\d+)\s+guests\b"
+            r"(?!\s+in\s+(?:the\s+)?(?:main\s+)?dining(?:\s+room)?\b)",
+        ),
+    )
 
 
 def _narrative_covers(
