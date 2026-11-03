@@ -13,6 +13,8 @@ from restaurantos.nightly_history import (
     write_history_manifest,
 )
 from restaurantos.operating_brief import (
+    BASE_METRICS,
+    OperatingPeriodSummary,
     generate_operating_brief,
     summarize_operating_period,
 )
@@ -140,28 +142,58 @@ def _validate_output_paths(
         raise ValueError("history, manifest, and brief outputs must use distinct paths")
 
 
+def _summarize_brief_window(
+    records: list[OperationalRecord],
+    window: NightlyBriefWindow,
+    restaurant: str,
+) -> OperatingPeriodSummary:
+    """Render genuinely empty report windows without inventing zero sales.
+
+    This is intentionally limited to scheduled briefs. The public summarizer
+    still rejects empty periods, and a wrong restaurant remains an error.
+    """
+    if not any(record.entity == restaurant for record in records):
+        raise ValueError("no daily records found for requested restaurant")
+
+    start = window.start_date.isoformat()
+    end = window.end_date.isoformat()
+    has_records = any(
+        record.entity == restaurant and start <= record.period <= end
+        for record in records
+    )
+    if not has_records:
+        return OperatingPeriodSummary(
+            entity=restaurant,
+            label=window.label or f"{start} to {end}",
+            start_date=window.start_date,
+            end_date=window.end_date,
+            service_nights=0,
+            totals=(),
+            coverage=tuple((metric, 0) for metric in BASE_METRICS),
+            derived=(),
+            derived_coverage=(),
+            estimated_sales_nights=0,
+        )
+
+    return summarize_operating_period(
+        records,
+        window.start_date,
+        window.end_date,
+        entity=restaurant,
+        label=window.label,
+    )
+
+
 def _render_brief(
     records: list[OperationalRecord],
     current: NightlyBriefWindow,
     compare: NightlyBriefWindow | None,
     restaurant: str,
 ) -> str:
-    current_summary = summarize_operating_period(
-        records,
-        current.start_date,
-        current.end_date,
-        entity=restaurant,
-        label=current.label,
-    )
+    current_summary = _summarize_brief_window(records, current, restaurant)
     previous_summary = None
     if compare is not None:
-        previous_summary = summarize_operating_period(
-            records,
-            compare.start_date,
-            compare.end_date,
-            entity=restaurant,
-            label=compare.label,
-        )
+        previous_summary = _summarize_brief_window(records, compare, restaurant)
     return generate_operating_brief(current_summary, previous_summary)
 
 
