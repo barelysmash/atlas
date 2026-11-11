@@ -27,6 +27,37 @@ def _first_money(text: str, labels: tuple[str, ...]) -> float | None:
     return None
 
 
+_DASH = "[-\u2013\u2014]"
+
+
+def _dash_value(text: str, labels: tuple[str, ...]) -> str | None:
+    """Read a line written ``LABEL- $1,234.56``: a dash where a colon belongs.
+
+    Some closers type the figures block that way. The label must start its
+    line and the value must follow on the same line, so a hyphen in the
+    narrative cannot match. Used only where the colon form found nothing.
+    """
+    for label in labels:
+        match = re.search(
+            rf"^[ \t]*(?:{label})[ \t]*{_DASH}[ \t]*\$?[ \t]*{_NUMBER}",
+            text,
+            re.IGNORECASE | re.MULTILINE,
+        )
+        if match:
+            return match.group(1)
+    return None
+
+
+def _dash_money(text: str, labels: tuple[str, ...]) -> float | None:
+    value = _dash_value(text, labels)
+    return None if value is None else _float(value)
+
+
+def _dash_number(text: str, labels: tuple[str, ...]) -> int | None:
+    value = _dash_value(text, labels)
+    return None if value is None else _int(value)
+
+
 def _money_values(text: str, label: str) -> tuple[float, ...]:
     matches = re.findall(
         rf"{label}\s*:\s*\$?\s*(-|[0-9][0-9,]*(?:\.\d+)?)",
@@ -193,7 +224,7 @@ def _comp_section(text: str) -> str:
     return text
 
 
-def _comp_lines(text: str) -> tuple[CompLine, ...]:
+def _comp_lines(text: str, *, dash_style: bool = False) -> tuple[CompLine, ...]:
     reserved = {
         "net sales",
         "splh",
@@ -228,7 +259,20 @@ def _comp_lines(text: str) -> tuple[CompLine, ...]:
         r"(?:\s*\((?P<count>\d+)\))?",
         re.IGNORECASE,
     )
-    for match in pattern.finditer(section):
+    matches = list(pattern.finditer(section))
+    if not matches and dash_style:
+        # ``BDAY- $120``: only in an email whose figures block is dash-style,
+        # and only for lines that carry a dollar amount.
+        matches = list(
+            re.finditer(
+                rf"^[ \t]*(?P<label>[A-Za-z][A-Za-z /&']{{1,36}}?)[ \t]*{_DASH}"
+                r"[ \t]*\$[ \t]*(?P<amount>[0-9][0-9,]*(?:\.\d+)?)"
+                r"(?:[ \t]*\((?P<count>\d+)\))?",
+                section,
+                re.IGNORECASE | re.MULTILINE,
+            )
+        )
+    for match in matches:
         label = " ".join(match.group("label").split()).strip()
         normalized = re.sub(r"[^a-z0-9]+", " ", label.lower()).strip()
         if normalized in reserved or normalized.startswith("total "):
@@ -297,6 +341,31 @@ def parse_nightly_email(
     hours_actual = _first_money(body, (r"(?:Hours|Horas)\s*\(actual\)",))
     if hours_actual is None:
         hours_actual = _first_money(body, (r"(?:Hours|Horas)",))
+
+    reported_splh = _first_money(body, (r"SPLH",))
+    net_sales = _first_money(body, (r"Net Sales",))
+    voids = _first_money(body, (r"Total Voids", r"Voids"))
+
+    # A figures block typed with dashes (``LABOR- $3,500.00``). Recognised only
+    # when the colon form gave neither SPLH nor labor, so an email the colon
+    # rules already read is parsed exactly as before.
+    dash_style = (
+        reported_splh is None
+        and labor_actual is None
+        and (
+            _dash_value(body, (r"SPLH",)) is not None
+            or _dash_value(body, (r"LABOR",)) is not None
+        )
+    )
+    if dash_style:
+        reported_splh = _dash_money(body, (r"SPLH",))
+        labor_actual = _dash_money(body, (r"LABOR",))
+        if hours_actual is None:
+            hours_actual = _dash_money(body, (r"HOURS", r"HORAS"))
+        if net_sales is None:
+            net_sales = _dash_money(body, (r"NET\s+SALES", r"SALES"))
+        if voids is None:
+            voids = _dash_money(body, (r"TOTAL\s+VOIDS", r"VOIDS"))
     if hours_actual is None:
         labor_actual_values = _money_values(body, r"Labor\s*\(actual\)")
         if (
@@ -315,19 +384,34 @@ def parse_nightly_email(
     )
     dining_room_covers = _first_number(
         body,
-        (r"Dining Room EOD Covers", r"Dining Room"),
+        (r"Dining Room EOD Covers", r"Dining Room", r"Total in Dining(?:\s+Room)?"),
     )
     bar_atrium_covers = _first_number(
         body,
         (r"Bar\s*/\s*Atrium", r"Atrium\s*/\s*Bar"),
     )
     total_covers = _structured_total(body)
+    if total_covers is None:
+        # ``Total in House: 412`` (the 2026-11 template).
+        total_covers = _first_number(body, (r"Total in (?:the\s+)?House",))
+    if dash_style:
+        if reservation_covers is None:
+            reservation_covers = _dash_number(body, (r"RES(?:ERVATIONS)?",))
+        if dining_room_covers is None:
+            dining_room_covers = _dash_number(body, (r"DIN(?:ING)?\s+ROOM",))
+        if bar_atrium_covers is None:
+            bar_atrium_covers = _dash_number(
+                body,
+                (r"BAR\s*/\s*ATRIUM", r"ATRIUM\s*/\s*BAR", r"BAR", r"ATRIUM"),
+            )
+        if total_covers is None:
+            total_covers = _dash_number(body, (r"TOTAL",))
 
     return NightlyReport(
         restaurant=restaurant,
         service_date=service_date,
-        net_sales=_first_money(body, (r"Net Sales",)),
-        reported_splh=_first_money(body, (r"SPLH",)),
+        net_sales=net_sales,
+        reported_splh=reported_splh,
         labor_cost_actual=labor_actual,
         labor_cost_scheduled=_first_money(
             body,
@@ -354,9 +438,9 @@ def parse_nightly_email(
         ),
         total_covers=total_covers if total_covers is not None else narrative_total,
         narrative_total_covers=_narrative_total(body),
-        comps=_comp_lines(body),
+        comps=_comp_lines(body, dash_style=dash_style),
         reported_total_comps=_first_money(body, (r"Total Comps", r"Comps")),
-        voids=_first_money(body, (r"Total Voids", r"Voids")),
+        voids=voids,
         void_count=_money_count(body, (r"Total Voids", r"Voids")),
         feature_sales=_feature_sales(body),
         source_message_id=source_message_id,

@@ -138,3 +138,103 @@ def test_cover_counts_parse_when_source_formats_them_as_currency():
     assert report.dining_room_covers == 263
     assert report.bar_atrium_covers == 126
     assert report.total_covers == 389
+
+
+# Shapes taken from three November 2026 reports Atlas could not fully read.
+# The figures are invented; only the layout is real.
+
+DASH_STYLE = """
+Good evening, everyone!!!
+
+Tonight at Fonda San Miguel we started with 240 covers and finished seating
+410 guests.
+In the dining room we hosted 3 set menus: 12 for a business dinner, 14 for a
+wedding dinner, and a 10-top birthday dinner. Our team helped celebrate
+4 anniversaries and 11 birthdays tonight, reaching a full house by 7 pm.
+
+Ensalada de Sandía — 14
+Tetela — 6
+
+SPLH -$71.25
+LABOR- $3650.40
+HOURS- 251.75
+ANNI- $120
+BDAY- $240
+MANAGER- $0
+VOIDS-$45
+RES- 240
+DIN ROOM- 285
+BAR- 125
+TOTAL- 410
+"""
+
+HOUSE_TOTAL = """
+We started with 210 reservations on the books including 3 set menus.
+
+Net Sales: $21,450.75
+SPLH: $101.20
+Labor (scheduled): $3900.00
+Labor (actual): $3725.50
+Hours (scheduled): 220.00
+Hours (actual): 211.96
+Total Comps: $512.40
+Birthday: $180 (12)
+Anniversary: $60 (4)
+Manager Meal: $112.40 (3)
+Voids: $131.25
+Reservations: 210
+Total in Dining: 268
+Total in Atrium/Bar: 139
+Total in House: 407
+Poussin: $640 (16)
+Set menu sales: $2,310 (33)
+"""
+
+
+def test_dash_separated_figures_block_is_read():
+    report = parse_nightly_email(DASH_STYLE, service_date=date(2026, 10, 29))
+
+    assert report.reported_splh == 71.25
+    assert report.labor_cost_actual == 3650.40
+    assert report.labor_hours_actual == 251.75
+    assert report.voids == 45.0
+    assert report.reservation_covers == 240
+    assert report.dining_room_covers == 285
+    assert report.bar_atrium_covers == 125
+    assert report.total_covers == 410
+    assert report.effective_total_covers == 410
+    assert {(line.category, line.amount) for line in report.comps} == {
+        ("ANNI", 120.0),
+        ("BDAY", 240.0),
+        ("MANAGER", 0.0),
+    }
+
+
+def test_dash_rules_do_not_read_menu_counts_or_narrative():
+    report = parse_nightly_email(DASH_STYLE, service_date=date(2026, 10, 29))
+
+    # "Ensalada de Sandía — 14" is a sold count, not a comp or a cover figure.
+    assert all("Ensalada" not in line.category for line in report.comps)
+    assert all("Tetela" not in line.category for line in report.comps)
+
+
+def test_house_total_template_is_read():
+    report = parse_nightly_email(HOUSE_TOTAL, service_date=date(2026, 11, 6))
+
+    assert report.net_sales == 21450.75
+    assert report.labor_cost_actual == 3725.50
+    assert report.labor_hours_actual == 211.96
+    assert report.reservation_covers == 210
+    assert report.dining_room_covers == 268
+    assert report.bar_atrium_covers == 139
+    assert report.total_covers == 407
+    assert report.effective_total_covers == 407
+
+
+def test_colon_style_reports_are_unchanged_by_the_dash_rules():
+    # A hyphenated narrative line must not override or add to colon figures.
+    body = AUG_11 + "\nLABOR- $9.99\nTOTAL- 1\nBDAY- $5\n"
+    baseline = parse_nightly_email(AUG_11, service_date=date(2026, 8, 11))
+    report = parse_nightly_email(body, service_date=date(2026, 8, 11))
+
+    assert report == baseline
