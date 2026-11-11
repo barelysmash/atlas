@@ -46,6 +46,7 @@ Expected private target paths:
 - `~/atlas-data/restaurantos/fonda/nightly-history.jsonl`
 - `~/atlas-data/restaurantos/fonda/nightly-manifest.json`
 - `~/atlas-data/restaurantos/fonda/operating-brief.md`
+- `~/atlas-data/env/atlas.env` (service secrets; see `deploy/env.template`)
 
 ## One-time host prerequisite
 
@@ -96,12 +97,47 @@ Do not copy the private files into this repository.
 endpoint and generates a month-to-date brief against the aligned prior-month
 period.
 
+## RestaurantOS peer API
+
+`atlas-restaurantos-api.service` is the surface JARVIS routes to, registered
+as `atlas` in jarvis-v2's `config/agents.yaml`
+(JAM `standards/agent-registration.md`). It is read-only and listens on
+`127.0.0.1:8790`.
+
+| Route | Auth | Returns |
+| --- | --- | --- |
+| `GET /health` | none | liveness only |
+| `GET /v1/freshness` | bearer | ledger dates and counts |
+| `POST /v1/operating-summary` | bearer | two periods compared |
+
+**Relative figures only.** The API reports percent changes, percentage-point
+deltas, directions and night counts. It never returns a dollar amount, a
+cover count, a labor total or a rate level, so the absolute figures in the
+private ledger do not leave Guildenstern through JARVIS. The limit is
+enforced here, in `restaurantos.relative_summary`, not in the adapter.
+
+`POST /v1/operating-summary` takes an optional JSON body: `start_date`,
+`end_date`, `compare_start_date`, `compare_end_date` (ISO dates, each pair
+together) and `entity`. With no dates it compares month to date, through the
+latest service night in the ledger, against the aligned days of the prior
+month. With a window and no comparison it uses the window of equal length
+just before it.
+
+The workload is blocked until both of these exist on the host:
+
+- `~/atlas-data/env/atlas.env`, mode 600, containing `ATLAS_API_TOKEN`
+  (at least 24 characters). Create it once, by hand; no deploy writes it.
+- `~/atlas-data/restaurantos/fonda/nightly-history.jsonl`
+
+The same token goes in JARVIS's environment file as `ATLAS_API_TOKEN`.
+
 ## Operations
 
 ```bash
 bash deploy/deploy.sh status
 bash deploy/deploy.sh run atlas-restaurantos-nightly.service
 bash deploy/deploy.sh logs atlas-restaurantos-nightly.service
+bash deploy/deploy.sh logs atlas-restaurantos-api.service
 bash deploy/deploy.sh rollback
 ```
 
