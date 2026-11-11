@@ -13,3 +13,20 @@ required_private_files = [
 services = ["atlas-restaurantos-nightly.service"]
 autostart_services = []
 timers = ["atlas-restaurantos-nightly.timer"]
+
+# Read-only peer API JARVIS routes to (jarvis-v2 config/agents.yaml: atlas).
+# Blocked until the token file and the nightly ledger both exist.
+[[workloads]]
+id = "restaurantos-api"
+data_dirs = [
+  "env",
+  "restaurantos",
+  "restaurantos/fonda",
+]
+required_private_files = [
+  "env/atlas.env",
+  "restaurantos/fonda/nightly-history.jsonl",
+]
+services = ["atlas-restaurantos-api.service"]
+autostart_services = ["atlas-restaurantos-api.service"]
+timers = []

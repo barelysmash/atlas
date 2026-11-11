@@ -1,6 +1,7 @@
 import argparse
 from datetime import date
 
+from restaurantos.api import DEFAULT_HOST, DEFAULT_PORT, config_from_env, serve
 from restaurantos.cli import morning_brief
 from restaurantos.gmail_nightly_refresh import (
     DEFAULT_GMAIL_NIGHTLY_QUERY,
@@ -107,7 +108,30 @@ def main() -> None:
     gmail_parser.add_argument("--overrides")
     _add_brief_arguments(gmail_parser)
 
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="run the read-only peer API (token from ATLAS_API_TOKEN)",
+    )
+    serve_parser.add_argument("--history", required=True)
+    serve_parser.add_argument("--manifest", required=True)
+    serve_parser.add_argument(
+        "--host", help=f"default ATLAS_API_HOST or {DEFAULT_HOST}"
+    )
+    serve_parser.add_argument(
+        "--port", type=int, help=f"default ATLAS_API_PORT or {DEFAULT_PORT}"
+    )
+
     args = parser.parse_args()
+
+    if args.command == "serve":
+        try:
+            config = config_from_env(
+                args.history, args.manifest, host=args.host, port=args.port
+            )
+        except ValueError as error:
+            parser.error(str(error))
+        serve(config)
+        return
 
     if args.command == "morning-brief":
         print(morning_brief(args.input, args.restaurant))

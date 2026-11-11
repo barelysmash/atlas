@@ -1,0 +1,30 @@
+[Unit]
+Description=Atlas RestaurantOS peer API (read-only, relative figures)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/atlas
+# ATLAS_API_TOKEN (required), optional ATLAS_API_PORT. Host state, mode 600;
+# a deploy never writes it. See deploy/env.template.
+EnvironmentFile=%h/atlas-data/env/atlas.env
+Environment=PYTHONUNBUFFERED=1
+Environment=ATLAS_TIMEZONE=America/Chicago
+Environment=ATLAS_API_HOST=127.0.0.1
+ExecStart=%h/atlas/.venv/bin/python -m restaurantos serve \
+    --history %h/atlas-data/restaurantos/fonda/nightly-history.jsonl \
+    --manifest %h/atlas-data/restaurantos/fonda/nightly-manifest.json
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
