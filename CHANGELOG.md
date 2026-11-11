@@ -5,6 +5,8 @@
 - RestaurantOS peer API (`restaurantos serve`, `atlas-restaurantos-api.service`):
   a read-only loopback service JARVIS routes to. Relative figures only; no
   absolute dollar or cover figure is returned.
+- Peer API summaries report, per period, how many nights are missing or in
+  review; the nightly manifest now lists reviewed nights by date.
 ### Fixed
 - Nightly reports whose figures block is typed with dashes (`LABOR- $3,500`)
   are now read; previously only the narrative covers were recovered.

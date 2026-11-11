@@ -71,6 +71,7 @@ _MANIFEST_KEYS = (
     "review_count",
     "warning_counts",
     "review_reason_counts",
+    "reviews",
 )
 
 
@@ -206,8 +207,84 @@ def _pair(
     return start, end
 
 
+def read_reviews(manifest_path: Path) -> dict[date, tuple[str, ...]] | None:
+    """Nights in review, by service date, from the manifest.
+
+    None means unknown: no manifest yet, or one written before reviews were
+    recorded by night. An empty dict means the manifest lists none.
+    """
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    entries = raw.get("reviews") if isinstance(raw, dict) else None
+    if not isinstance(entries, list):
+        return None
+    reviews: dict[date, tuple[str, ...]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            night = date.fromisoformat(str(entry.get("service_date")))
+        except ValueError:
+            continue
+        reasons = entry.get("reasons")
+        reviews[night] = tuple(
+            str(reason) for reason in (reasons if isinstance(reasons, list) else [])
+        )
+    return reviews
+
+
+def _coverage(
+    period: dict[str, Any],
+    records: list[OperationalRecord],
+    entity: str,
+    reviews: dict[date, tuple[str, ...]] | None,
+) -> dict[str, Any]:
+    """How much of a period to trust: counts of nights, never figures.
+
+    ``nights_missing`` are reviewed nights with nothing in the ledger (the
+    report arrived but could not be read). ``nights_in_review`` are nights in
+    the ledger with something flagged, usually one missing field.
+    """
+    if reviews is None:
+        return {
+            "nights_in_review": None,
+            "nights_missing": None,
+            "review_reasons": None,
+        }
+    start = date.fromisoformat(period["start_date"])
+    end = date.fromisoformat(period["end_date"])
+    in_ledger = {
+        record.period
+        for record in records
+        if record.entity == entity
+        and start.isoformat() <= record.period <= end.isoformat()
+    }
+    in_review = 0
+    missing = 0
+    reasons: dict[str, int] = {}
+    for night, night_reasons in reviews.items():
+        if not start <= night <= end:
+            continue
+        if night.isoformat() in in_ledger:
+            in_review += 1
+        else:
+            missing += 1
+        for reason in night_reasons:
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return {
+        "nights_in_review": in_review,
+        "nights_missing": missing,
+        "review_reasons": dict(sorted(reasons.items())),
+    }
+
+
 def operating_summary(
-    records: list[OperationalRecord], payload: dict[str, Any]
+    records: list[OperationalRecord],
+    payload: dict[str, Any],
+    *,
+    reviews: dict[date, tuple[str, ...]] | None = None,
 ) -> dict[str, Any]:
     """Resolve the two windows and compare them, relative figures only.
 
@@ -280,7 +357,16 @@ def operating_summary(
             f"comparison period: {error}",
         ) from None
 
-    return relative_operating_summary(current, previous)
+    summary = relative_operating_summary(current, previous)
+    for name in ("current", "previous"):
+        summary[name].update(_coverage(summary[name], records, current.entity, reviews))
+    summary["notes"].append(
+        "nights_missing counts nights whose report arrived but could not be "
+        "read, so they are absent from the comparison. nights_in_review "
+        "counts nights that are included but have a field flagged. null "
+        "means unknown."
+    )
+    return summary
 
 
 def freshness(ledger: Ledger, manifest_path: Path, *, today: date) -> dict[str, Any]:
@@ -394,7 +480,11 @@ class _Handler(BaseHTTPRequestHandler):
                     self.ledger, self.config.manifest_path, today=self._today()
                 )
             elif path == "/v1/operating-summary" and method == "POST":
-                data = operating_summary(self.ledger.records(), self._body())
+                data = operating_summary(
+                    self.ledger.records(),
+                    self._body(),
+                    reviews=read_reviews(self.config.manifest_path),
+                )
             else:
                 self.close_connection = True
                 raise ApiError(HTTPStatus.NOT_FOUND, "not_found", "No such route.")

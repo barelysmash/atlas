@@ -123,6 +123,13 @@ latest service night in the ledger, against the aligned days of the prior
 month. With a window and no comparison it uses the window of equal length
 just before it.
 
+Each period in the summary also says how far to trust it, as counts of
+nights: `nights_missing` (a report arrived but could not be read, so the
+night is absent from the comparison) and `nights_in_review` (included, with
+a field flagged), plus the review reasons. They come from the nightly
+manifest and are `null` until a nightly run has written one that lists
+reviews by night.
+
 The workload is blocked until both of these exist on the host:
 
 - `~/atlas-data/env/atlas.env`, mode 600, containing `ATLAS_API_TOKEN`
