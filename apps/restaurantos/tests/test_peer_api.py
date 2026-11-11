@@ -17,6 +17,7 @@ from restaurantos.api import (
     freshness,
     make_server,
     operating_summary,
+    read_reviews,
 )
 from restaurantos.nightly_history import read_history_jsonl
 from restaurantos.operating_brief import summarize_operating_period
@@ -104,6 +105,16 @@ def write_manifest(path: Path) -> Path:
                 "review_count": 1,
                 "warning_counts": {"estimated_sales": 1},
                 "review_reason_counts": {},
+                "reviews": [
+                    # In the ledger, one field flagged.
+                    {"service_date": "2026-06-02", "reasons": ["missing_total_covers"]},
+                    # Not in the ledger: the report could not be read.
+                    {
+                        "service_date": "2026-06-03",
+                        "reasons": ["primary_without_operational_data"],
+                    },
+                    {"service_date": "2026-05-01", "reasons": ["missing_total_covers"]},
+                ],
                 "not_a_manifest_field": "must not be relayed",
             }
         ),
@@ -500,3 +511,80 @@ def test_internal_errors_do_not_echo_ledger_content(
     assert status == 500
     assert body["error"]["code"] == "internal_error"
     assert "424242" not in json.dumps(body)
+
+
+# --- coverage ---------------------------------------------------------------
+
+
+def test_summary_reports_missing_and_reviewed_nights(tmp_path: Path, ledger_path: Path):
+    reviews = read_reviews(write_manifest(tmp_path / "manifest.json"))
+    result = operating_summary(
+        read_history_jsonl(ledger_path),
+        {
+            "start_date": "2026-06-01",
+            "end_date": "2026-06-03",
+            "compare_start_date": "2026-05-01",
+            "compare_end_date": "2026-05-03",
+        },
+        reviews=reviews,
+    )
+
+    current = result["current"]
+    assert current["nights_in_review"] == 1
+    assert current["nights_missing"] == 1
+    assert current["review_reasons"] == {
+        "missing_total_covers": 1,
+        "primary_without_operational_data": 1,
+    }
+    assert result["previous"]["nights_in_review"] == 1
+    assert result["previous"]["nights_missing"] == 0
+    assert set(_numbers(result)) & _absolute_figures() == set()
+
+
+def test_reviews_outside_the_window_are_not_counted(tmp_path: Path, ledger_path: Path):
+    reviews = read_reviews(write_manifest(tmp_path / "manifest.json"))
+    result = operating_summary(read_history_jsonl(ledger_path), {}, reviews=reviews)
+
+    # Default windows are June 1-2 against May 1-2: June 3 is outside.
+    assert result["current"]["nights_missing"] == 0
+    assert result["current"]["nights_in_review"] == 1
+
+
+def test_coverage_is_unknown_without_reviews_by_night(
+    tmp_path: Path, ledger_path: Path
+):
+    old_manifest = tmp_path / "old.json"
+    old_manifest.write_text('{"review_count": 3}', encoding="utf-8")
+    assert read_reviews(old_manifest) is None
+    assert read_reviews(tmp_path / "absent.json") is None
+
+    result = operating_summary(read_history_jsonl(ledger_path), {}, reviews=None)
+    assert result["current"]["nights_missing"] is None
+    assert result["current"]["nights_in_review"] is None
+    assert result["current"]["review_reasons"] is None
+
+
+def test_read_reviews_ignores_malformed_entries(tmp_path: Path):
+    manifest = tmp_path / "m.json"
+    manifest.write_text(
+        '{"reviews": [{"service_date": "nope"}, 7, '
+        '{"service_date": "2026-06-02", "reasons": "x"}]}',
+        encoding="utf-8",
+    )
+    assert read_reviews(manifest) == {date(2026, 6, 2): ()}
+
+
+def test_coverage_over_http(server: ThreadingHTTPServer):
+    status, body = call(
+        server,
+        "POST",
+        "/v1/operating-summary",
+        body={
+            "start_date": "2026-06-01",
+            "end_date": "2026-06-03",
+            "compare_start_date": "2026-05-01",
+            "compare_end_date": "2026-05-02",
+        },
+    )
+    assert status == 200
+    assert body["data"]["current"]["nights_missing"] == 1

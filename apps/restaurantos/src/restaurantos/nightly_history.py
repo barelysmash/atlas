@@ -22,6 +22,9 @@ class NightlyHistoryManifest:
     review_count: int
     warning_counts: tuple[tuple[str, int], ...]
     review_reason_counts: tuple[tuple[str, int], ...]
+    # Which nights are in review and why: (service date, reasons). Dates and
+    # reason names only, so the peer API can say how much of a window to trust.
+    reviews: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +51,12 @@ def _manifest(
     review_reason_counts = Counter(
         reason for review in result.review for reason in review.reasons
     )
+    reasons_by_date: dict[str, set[str]] = {}
+    for review in result.review:
+        if review.service_date is not None:
+            reasons_by_date.setdefault(review.service_date.isoformat(), set()).update(
+                review.reasons
+            )
 
     return NightlyHistoryManifest(
         service_nights=len(result.entries),
@@ -58,6 +67,10 @@ def _manifest(
         review_count=len(result.review),
         warning_counts=tuple(sorted(warning_counts.items())),
         review_reason_counts=tuple(sorted(review_reason_counts.items())),
+        reviews=tuple(
+            (service_date, tuple(sorted(reasons)))
+            for service_date, reasons in sorted(reasons_by_date.items())
+        ),
     )
 
 
@@ -180,6 +193,10 @@ def write_history_manifest(path: str | Path, history: NightlyHistory) -> Path:
         "review_count": manifest.review_count,
         "warning_counts": dict(manifest.warning_counts),
         "review_reason_counts": dict(manifest.review_reason_counts),
+        "reviews": [
+            {"service_date": service_date, "reasons": list(reasons)}
+            for service_date, reasons in manifest.reviews
+        ],
     }
     temporary.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

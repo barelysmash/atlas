@@ -131,3 +131,35 @@ def test_manifest_is_privacy_safe_and_counts_review_reasons(tmp_path):
     assert payload["review_reason_counts"]["missing_labor_cost_actual"] == 1
     assert payload["review_reason_counts"]["missing_labor_hours_actual"] == 1
     assert "private-incomplete-id" not in path.read_text(encoding="utf-8")
+
+
+def test_manifest_lists_reviewed_nights_by_date_without_message_ids(tmp_path):
+    incomplete = NightlyEmailMessage(
+        message_id="private-incomplete-id",
+        subject="EOD 08.18.26",
+        body="SPLH: $91.50\nTotal Comps: $902.50\n",
+        sent_at=datetime(2026, 8, 19, 0, 5, tzinfo=UTC),
+    )
+    figureless = NightlyEmailMessage(
+        message_id="private-figureless-id",
+        subject="EOD 08.17.26",
+        body="Great night, see the photo.",
+        sent_at=datetime(2026, 8, 18, 0, 5, tzinfo=UTC),
+    )
+    history = build_nightly_history(
+        backfill_nightly_emails((incomplete, figureless, nightly_message()))
+    )
+
+    path = write_history_manifest(tmp_path / "manifest.json", history)
+    text = path.read_text(encoding="utf-8")
+    payload = json.loads(text)
+
+    assert [review["service_date"] for review in payload["reviews"]] == [
+        "2026-08-17",
+        "2026-08-18",
+    ]
+    assert payload["reviews"][0]["reasons"] == ["primary_without_operational_data"]
+    assert "missing_labor_cost_actual" in payload["reviews"][1]["reasons"]
+    assert "private-" not in text
+    # Dates and reason names only: no figure from either email.
+    assert "91.5" not in text and "902.5" not in text
