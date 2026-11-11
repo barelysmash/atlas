@@ -105,3 +105,60 @@ def test_deterministic_bar_atrium_total_transposition_is_repaired():
     assert entry.report.bar_atrium_covers == 168
     assert entry.report.total_covers == 454
     assert "bar_atrium_total_probably_swapped" in entry.warnings
+
+
+def test_dated_report_without_figures_is_reviewed_not_lost():
+    photo_only = message(
+        "photo-only",
+        "EOD 11.05.26",
+        "Good evening everyone! It was busy!! We had a backroom buyout.\n"
+        "Cocktail received an influx of people, with 30 guests arriving late.",
+        datetime(2026, 11, 6, 5, 32, tzinfo=UTC),
+    )
+
+    result = backfill_nightly_emails((photo_only,))
+
+    assert result.entries == ()
+    assert result.skipped_message_ids == ("photo-only",)
+    assert len(result.review) == 1
+    assert result.review[0].service_date == date(2026, 11, 5)
+    assert result.review[0].reasons == ("primary_without_operational_data",)
+    assert result.review[0].source_message_ids == ("photo-only",)
+
+
+def test_figureless_report_is_not_reviewed_when_another_covers_the_night():
+    photo_only = message(
+        "photo-only",
+        "EOD 11.05.26",
+        "See the attached photo for tonight.",
+        datetime(2026, 11, 6, 5, 32, tzinfo=UTC),
+    )
+    resend = message(
+        "resend",
+        "EOD 11.05.26",
+        "SPLH: $ 100\nLabor: $ 4000\nHours: $ 300\nReservations: 200\nTotal: 500\n",
+        datetime(2026, 11, 6, 6, 10, tzinfo=UTC),
+    )
+
+    result = backfill_nightly_emails((photo_only, resend))
+
+    assert [entry.report.service_date for entry in result.entries] == [
+        date(2026, 11, 5)
+    ]
+    assert result.review == ()
+
+
+def test_dash_style_report_passes_the_operational_gate_without_narrative():
+    dash_only = message(
+        "dash-only",
+        "EOD 10.29.26",
+        "SPLH -$71.25\nLABOR- $3650.40\nHOURS- 251.75\nRES- 240\nTOTAL- 410\n",
+        datetime(2026, 10, 30, 4, 49, tzinfo=UTC),
+    )
+
+    result = backfill_nightly_emails((dash_only,))
+
+    assert result.skipped_message_ids == ()
+    assert result.review == ()
+    assert result.entries[0].report.labor_cost_actual == 3650.40
+    assert result.entries[0].report.total_covers == 410

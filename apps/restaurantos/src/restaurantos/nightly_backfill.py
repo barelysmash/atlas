@@ -23,6 +23,12 @@ _OPERATIONAL_LABEL = re.compile(
     r"Bar\s*/\s*Atrium|Atrium\s*/\s*Bar|Total|Net Sales|Comps?|Voids?)\s*:",
     re.IGNORECASE,
 )
+# The same figures block typed with dashes: ``SPLH -$72.00`` / ``LABOR- $3,500``.
+_DASH_OPERATIONAL = re.compile(
+    r"^[ \t]*(?:SPLH|LABOR|HOURS|HORAS|NET\s+SALES)[ \t]*[-\u2013\u2014]"
+    r"[ \t]*\$?[ \t]*\d",
+    re.IGNORECASE | re.MULTILINE,
+)
 _COMPACT_COVERS = re.compile(
     r"\bStarting\s*:\s*(?P<starting>\d+)\b.*?"
     r"\bEnd\s*:\s*(?P<end>\d+)\b.*?"
@@ -157,6 +163,7 @@ def _looks_like_reaction(text: str) -> bool:
 def _has_operational_data(text: str) -> bool:
     return bool(
         _OPERATIONAL_LABEL.search(text)
+        or _DASH_OPERATIONAL.search(text)
         or _COMPACT_COVERS.search(text)
         or _NARRATIVE_OPERATIONAL.search(text)
     )
@@ -360,10 +367,33 @@ def backfill_nightly_emails(
     reviews: list[BackfillReview] = []
     overrides = service_date_overrides or {}
 
+    # Direct reports that carry no figures in their text (the numbers were
+    # in a photo, or never typed). Skipping them silently loses the night
+    # without a trace, so they are reviewed below unless another message
+    # supplies that night.
+    empty_primaries: dict[date, list[str]] = {}
+
     for message in messages:
         head = _reply_head(message.body)
         if _looks_like_reaction(head) or not _has_operational_data(message.body):
             skipped.append(message.message_id)
+            if (
+                not _looks_like_reaction(head)
+                and not _is_reply(message.subject)
+                and not _is_forward(message.subject)
+                and re.search(r"\bEOD\b", message.subject, re.IGNORECASE)
+            ):
+                # Only a subject that names its night counts as a report: a
+                # bare "EOD" thread is chatter and stays silently skipped.
+                empty_date: date | None = overrides.get(message.message_id)
+                if empty_date is None and _subject_date(
+                    message.subject, message.sent_at
+                ):
+                    empty_date, _ = infer_service_date(message.subject, message.sent_at)
+                if empty_date is not None:
+                    empty_primaries.setdefault(empty_date, []).append(
+                        message.message_id
+                    )
             continue
 
         date_warnings: tuple[str, ...]
@@ -483,6 +513,20 @@ def backfill_nightly_emails(
                 warnings=tuple(dict.fromkeys(entry_warnings)),
             )
         )
+
+    covered = {entry.report.service_date for entry in entries}
+    covered.update(
+        review.service_date for review in reviews if review.service_date is not None
+    )
+    for empty_date in sorted(empty_primaries):
+        if empty_date not in covered:
+            reviews.append(
+                BackfillReview(
+                    service_date=empty_date,
+                    source_message_ids=tuple(empty_primaries[empty_date]),
+                    reasons=("primary_without_operational_data",),
+                )
+            )
 
     return BackfillResult(
         entries=tuple(entries),
