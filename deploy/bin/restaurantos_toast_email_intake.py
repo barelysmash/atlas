@@ -1,10 +1,13 @@
 """Manually stage Toast Gmail attachments for review; no ledger modifications."""
+
 import argparse
 import json
 from pathlib import Path
 
 from restaurantos.gmail_mailbox import (
-    GmailApiMailbox, GmailOAuthCredentials, GmailOAuthTokenProvider,
+    GmailApiMailbox,
+    GmailOAuthCredentials,
+    GmailOAuthTokenProvider,
 )
 from restaurantos.toast_email_intake import stage_toast_gmail_imports
 
@@ -23,10 +26,12 @@ def main() -> int:
     )
     mailbox = GmailApiMailbox(token_provider=provider, query=args.query)
     results = stage_toast_gmail_imports(
-        mailbox, args.output_dir, query=args.query,
+        mailbox,
+        args.output_dir,
+        query=args.query,
     )
     print(json.dumps(results, indent=2, sort_keys=True))
-    return 1 if any(item["status"] not in ("pending_review",) for item in results) else 0
+    return int(any(item["status"] != "pending_review" for item in results))
 
 
 if __name__ == "__main__":

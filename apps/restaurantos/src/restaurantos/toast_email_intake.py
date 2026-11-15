@@ -1,4 +1,5 @@
 """Review-only Gmail intake for Toast exports; does not mutate the nightly ledger."""
+
 from __future__ import annotations
 
 import base64
@@ -6,18 +7,22 @@ import csv
 import hashlib
 import io
 import json
+import math
 import re
 import zipfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from restaurantos.gmail_mailbox import GmailApiMailbox
 
 MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 30 * 1024 * 1024
 MAX_ZIP_MEMBERS = 100
-DATE_PATTERN = re.compile(r"SalesSummary_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.zip$", re.I)
+DATE_PATTERN = re.compile(
+    r"SalesSummary_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.zip$", re.I
+)
 
 
 @dataclass(frozen=True)
@@ -32,7 +37,8 @@ class ToastSalesPreview:
 def _csv_rows(archive: zipfile.ZipFile, name: str) -> list[dict[str, str]]:
     data = archive.read(name)
     text = data.decode("utf-8-sig")
-    return list(csv.DictReader(io.StringIO(text)))
+    rows: list[dict[str, str]] = list(csv.DictReader(io.StringIO(text)))
+    return rows
 
 
 def preview_sales_summary(filename: str, data: bytes) -> ToastSalesPreview:
@@ -62,8 +68,12 @@ def preview_sales_summary(filename: str, data: bytes) -> ToastSalesPreview:
             if not member.filename.lower().endswith(".csv"):
                 raise ValueError("unexpected non-CSV ZIP member")
         names = {member.filename for member in members}
-        required = {"Revenue summary.csv", "Net sales summary.csv",
-                    "Sales by day.csv", "Service mode summary.csv"}
+        required = {
+            "Revenue summary.csv",
+            "Net sales summary.csv",
+            "Sales by day.csv",
+            "Service mode summary.csv",
+        }
         if not required <= names:
             raise ValueError("missing required Toast sales reports")
         revenue = _csv_rows(archive, "Revenue summary.csv")
@@ -84,31 +94,43 @@ def preview_sales_summary(filename: str, data: bytes) -> ToastSalesPreview:
         if len(mode_totals) != 1:
             raise ValueError("missing unique service mode total")
         mode_sales = float(mode_totals[0]["Net sales"])
-        if any(abs(value - sales) > 0.011 for value in
-               (gross + discounts + refunds, revenue_sales, daily_sales, mode_sales)):
+        if not math.isfinite(sales) or any(
+            not math.isfinite(value) or abs(value - sales) > 0.011
+            for value in (
+                gross + discounts + refunds,
+                revenue_sales,
+                daily_sales,
+                mode_sales,
+            )
+        ):
             raise ValueError("conflicting Toast net sales")
         guests = int(daily[0]["Total guests"])
         orders = int(daily[0]["Total orders"])
         if guests < 0 or orders < 0 or sales < 0:
             raise ValueError("unexpected negative totals")
-        if guests != int(mode_totals[0]["Total guests"]) or orders != int(mode_totals[0]["Total orders"]):
+        if guests != int(mode_totals[0]["Total guests"]) or orders != int(
+            mode_totals[0]["Total orders"]
+        ):
             raise ValueError("conflicting Toast guest or order totals")
-        return ToastSalesPreview(match.group(1), sales, guests, orders,
-                                 hashlib.sha256(data).hexdigest())
+        return ToastSalesPreview(
+            match.group(1), sales, guests, orders, hashlib.sha256(data).hexdigest()
+        )
 
 
 def _decode_data(encoded: str) -> bytes:
     return base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
 
 
-def _attachment_parts(payload: dict) -> list[dict]:
-    results = []
-    def walk(part: dict) -> None:
+def _attachment_parts(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+
+    def walk(part: dict[str, Any]) -> None:
         if part.get("filename") and isinstance(part.get("body"), dict):
             results.append(part)
         for child in part.get("parts") or []:
             if isinstance(child, dict):
                 walk(child)
+
     walk(payload)
     return results
 
@@ -118,7 +140,7 @@ def stage_toast_gmail_imports(
     destination: str | Path,
     *,
     query: str = "label:Atlas/Imports has:attachment -in:trash -in:spam",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Fetch matching Gmail attachments into immutable private staging.
 
     Files are never applied to the ledger. Errors are returned for review,
@@ -127,45 +149,72 @@ def stage_toast_gmail_imports(
     root = Path(destination)
     root.mkdir(parents=True, exist_ok=True)
     token = mailbox.token_provider.access_token()
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for message_id in mailbox._message_ids(token, query):
         message = mailbox._get(
-            f"users/{mailbox.user_id}/messages/{message_id}", token,
+            f"users/{mailbox.user_id}/messages/{message_id}",
+            token,
             {"format": "full"},
         )
         for part in _attachment_parts(message.get("payload", {})):
             filename = part["filename"]
             if not filename.lower().endswith(".zip"):
-                results.append({"message_id": message_id, "filename": filename,
-                                "status": "unsupported_review"})
+                results.append(
+                    {
+                        "message_id": message_id,
+                        "filename": filename,
+                        "status": "unsupported_review",
+                    }
+                )
                 continue
             body = part["body"]
+            declared_size = body.get("size", 0)
+            if isinstance(declared_size, int) and declared_size > MAX_ATTACHMENT_BYTES:
+                results.append(
+                    {
+                        "message_id": message_id,
+                        "filename": filename,
+                        "status": "too_large",
+                    }
+                )
+                continue
             encoded = body.get("data")
             if not encoded:
                 attachment_id = body.get("attachmentId")
                 if not attachment_id:
-                    results.append({"message_id": message_id, "filename": filename,
-                                    "status": "missing_attachment_body"})
+                    results.append(
+                        {
+                            "message_id": message_id,
+                            "filename": filename,
+                            "status": "missing_attachment_body",
+                        }
+                    )
                     continue
                 encoded = mailbox._get(
                     f"users/{mailbox.user_id}/messages/{message_id}/attachments/{attachment_id}",
                     token,
                 ).get("data")
             if not isinstance(encoded, str):
-                results.append({"message_id": message_id, "filename": filename,
-                                "status": "invalid_attachment_body"})
+                results.append(
+                    {
+                        "message_id": message_id,
+                        "filename": filename,
+                        "status": "invalid_attachment_body",
+                    }
+                )
                 continue
-            declared_size = body.get("size", 0)
-            if isinstance(declared_size, int) and declared_size > MAX_ATTACHMENT_BYTES:
-                results.append({"message_id": message_id, "filename": filename,
-                                "status": "too_large"})
-                continue
-            data = _decode_data(encoded)
             try:
+                data = _decode_data(encoded)
                 preview = preview_sales_summary(filename, data)
-            except (ValueError, KeyError, UnicodeError, OverflowError, zipfile.BadZipFile) as exc:
-                results.append({"message_id": message_id, "filename": filename,
-                                "status": "validation_failed", "reason": str(exc)})
+            except (ValueError, KeyError, TypeError, zipfile.BadZipFile) as exc:
+                results.append(
+                    {
+                        "message_id": message_id,
+                        "filename": filename,
+                        "status": "validation_failed",
+                        "reason": str(exc),
+                    }
+                )
                 continue
             item_dir = root / preview.source_sha256
             item_dir.mkdir(mode=0o700, exist_ok=True)
@@ -187,7 +236,9 @@ def stage_toast_gmail_imports(
                 "sha256": preview.source_sha256,
             }
             if not metadata.exists():
-                metadata.write_text(json.dumps(review, indent=2) + "\n", encoding="utf-8")
+                metadata.write_text(
+                    json.dumps(review, indent=2) + "\n", encoding="utf-8"
+                )
                 metadata.chmod(0o600)
             results.append(review)
     return results
