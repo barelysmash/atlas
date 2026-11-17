@@ -20,9 +20,10 @@ been completed.
 3. Review JSON output and inspect each private
    `toast-import-review/<sha256>/review.json`. The original is retained as
    `source.zip` with owner-only permissions.
-4. For November 5, expect service date `2026-11-05`, net sales
-   `38263.87`, guests `524`, and orders `150`. Labor and reservation
-   data are **not** provided by this export.
+4. Check each `review.json` against the Toast report it came from: service
+   date, net sales, guests and orders should match. Figures stay in the
+   private review folder and are never written into this repository. Labor
+   and reservation data are **not** provided by this export.
 5. Apply/reconciliation into the canonical ledger is **not implemented in this
    PR**. Approval and an explicit, audited apply phase are required before a
    recovered date can enter the operating brief.
