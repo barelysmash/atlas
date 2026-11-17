@@ -1,5 +1,6 @@
 import json
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,7 @@ from atlas_core.derived_metric_engine import derive_metrics
 from atlas_core.operational_record import OperationalRecord
 
 from restaurantos.metrics import NIGHTLY_DERIVED_METRICS
-from restaurantos.nightly import normalize_nightly_report
+from restaurantos.nightly import NightlyReport, normalize_nightly_report
 from restaurantos.nightly_backfill import BackfillResult
 
 
@@ -25,6 +26,10 @@ class NightlyHistoryManifest:
     # Which nights are in review and why: (service date, reasons). Dates and
     # reason names only, so the peer API can say how much of a window to trust.
     reviews: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # Nights that came from an approved supplemental source (a Toast sales
+    # summary) because no nightly email could be read. They carry net sales
+    # and voids only: no labor, covers, reservations or comps.
+    partial_nights: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,9 +46,11 @@ def _record_sort_key(record: OperationalRecord) -> tuple[str, str, str, str]:
 def _manifest(
     result: BackfillResult,
     records: list[OperationalRecord],
+    partial_nights: tuple[str, ...] = (),
 ) -> NightlyHistoryManifest:
     service_dates = sorted(
-        entry.report.service_date.isoformat() for entry in result.entries
+        [entry.report.service_date.isoformat() for entry in result.entries]
+        + list(partial_nights)
     )
     warning_counts = Counter(
         warning for entry in result.entries for warning in entry.warnings
@@ -59,7 +66,7 @@ def _manifest(
             )
 
     return NightlyHistoryManifest(
-        service_nights=len(result.entries),
+        service_nights=len(service_dates),
         record_count=len(records),
         first_service_date=service_dates[0] if service_dates else None,
         last_service_date=service_dates[-1] if service_dates else None,
@@ -71,6 +78,7 @@ def _manifest(
             (service_date, tuple(sorted(reasons)))
             for service_date, reasons in sorted(reasons_by_date.items())
         ),
+        partial_nights=partial_nights,
     )
 
 
@@ -78,8 +86,14 @@ def build_nightly_history(
     result: BackfillResult,
     *,
     include_derived_metrics: bool = True,
+    supplemental_reports: Sequence[NightlyReport] = (),
+    supplemental_source: str = "toast_sales_summary",
 ) -> NightlyHistory:
-    """Build canonical daily history from a reconciled nightly backfill."""
+    """Build canonical daily history from a reconciled nightly backfill.
+
+    ``supplemental_reports`` fill nights the backfill has no entry for. A
+    night with a nightly email is never overridden: the email wins.
+    """
     records: list[OperationalRecord] = []
 
     for entry in result.entries:
@@ -88,10 +102,24 @@ def build_nightly_history(
             nightly_records = derive_metrics(nightly_records, NIGHTLY_DERIVED_METRICS)
         records.extend(nightly_records)
 
+    covered = {entry.report.service_date for entry in result.entries}
+    partial_nights: list[str] = []
+    for report in sorted(supplemental_reports, key=lambda item: item.service_date):
+        if report.service_date in covered:
+            continue
+        covered.add(report.service_date)
+        supplemental = normalize_nightly_report(report, source=supplemental_source)
+        if not supplemental:
+            continue
+        if include_derived_metrics:
+            supplemental = derive_metrics(supplemental, NIGHTLY_DERIVED_METRICS)
+        records.extend(supplemental)
+        partial_nights.append(report.service_date.isoformat())
+
     records.sort(key=_record_sort_key)
     return NightlyHistory(
         records=tuple(records),
-        manifest=_manifest(result, records),
+        manifest=_manifest(result, records, tuple(partial_nights)),
     )
 
 
@@ -197,6 +225,7 @@ def write_history_manifest(path: str | Path, history: NightlyHistory) -> Path:
             {"service_date": service_date, "reasons": list(reasons)}
             for service_date, reasons in manifest.reviews
         ],
+        "partial_nights": list(manifest.partial_nights),
     }
     temporary.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

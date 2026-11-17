@@ -72,6 +72,7 @@ _MANIFEST_KEYS = (
     "warning_counts",
     "review_reason_counts",
     "reviews",
+    "partial_nights",
 )
 
 
@@ -235,6 +236,36 @@ def read_reviews(manifest_path: Path) -> dict[date, tuple[str, ...]] | None:
     return reviews
 
 
+def read_partial_nights(manifest_path: Path) -> set[date] | None:
+    """Nights filled from an approved Toast summary: net sales and voids only.
+
+    None means unknown: no manifest, or one written before partial nights
+    were recorded.
+    """
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    entries = raw.get("partial_nights") if isinstance(raw, dict) else None
+    if not isinstance(entries, list):
+        return None
+    nights: set[date] = set()
+    for entry in entries:
+        try:
+            nights.add(date.fromisoformat(str(entry)))
+        except ValueError:
+            continue
+    return nights
+
+
+def _partial_count(period: dict[str, Any], partial: set[date] | None) -> int | None:
+    if partial is None:
+        return None
+    start = date.fromisoformat(period["start_date"])
+    end = date.fromisoformat(period["end_date"])
+    return sum(1 for night in partial if start <= night <= end)
+
+
 def _coverage(
     period: dict[str, Any],
     records: list[OperationalRecord],
@@ -285,6 +316,7 @@ def operating_summary(
     payload: dict[str, Any],
     *,
     reviews: dict[date, tuple[str, ...]] | None = None,
+    partial_nights: set[date] | None = None,
 ) -> dict[str, Any]:
     """Resolve the two windows and compare them, relative figures only.
 
@@ -360,11 +392,14 @@ def operating_summary(
     summary = relative_operating_summary(current, previous)
     for name in ("current", "previous"):
         summary[name].update(_coverage(summary[name], records, current.entity, reviews))
+        summary[name]["nights_partial"] = _partial_count(summary[name], partial_nights)
     summary["notes"].append(
         "nights_missing counts nights whose report arrived but could not be "
         "read, so they are absent from the comparison. nights_in_review "
-        "counts nights that are included but have a field flagged. null "
-        "means unknown."
+        "counts nights that are included but have a field flagged. "
+        "nights_partial counts nights filled from a point-of-sale summary: "
+        "they add to net sales and voids only, and are left out of every "
+        "labor, cover, reservation and comp figure. null means unknown."
     )
     return summary
 
@@ -484,6 +519,7 @@ class _Handler(BaseHTTPRequestHandler):
                     self.ledger.records(),
                     self._body(),
                     reviews=read_reviews(self.config.manifest_path),
+                    partial_nights=read_partial_nights(self.config.manifest_path),
                 )
             else:
                 self.close_connection = True

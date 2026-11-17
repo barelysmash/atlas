@@ -19,6 +19,11 @@ from restaurantos.operating_brief import (
     summarize_operating_period,
 )
 from restaurantos.operating_brief_runner import write_operating_brief
+from restaurantos.toast_import_apply import (
+    TOAST_SOURCE,
+    approved_reports,
+    read_approved_nights,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,11 +209,16 @@ def rebuild_nightly_history(
     *,
     restaurant: str,
     overrides_path: str | Path | None = None,
+    approved_imports_path: str | Path | None = None,
     brief_path: str | Path | None = None,
     brief_window: NightlyBriefWindow | None = None,
     compare_window: NightlyBriefWindow | None = None,
 ) -> NightlyRefreshResult:
-    """Deterministically rebuild private history from a complete source bundle."""
+    """Deterministically rebuild private history from a complete source bundle.
+
+    ``approved_imports_path`` is the private folder of approved Toast nights.
+    Each fills a night with no readable nightly email, as a partial night.
+    """
     if not restaurant.strip():
         raise ValueError("restaurant is required")
     if (brief_path is None) != (brief_window is None):
@@ -235,7 +245,16 @@ def rebuild_nightly_history(
         restaurant=restaurant,
         service_date_overrides=overrides,
     )
-    history = build_nightly_history(backfill)
+    supplemental = (
+        approved_reports(read_approved_nights(approved_imports_path), restaurant)
+        if approved_imports_path is not None
+        else []
+    )
+    history = build_nightly_history(
+        backfill,
+        supplemental_reports=supplemental,
+        supplemental_source=TOAST_SOURCE,
+    )
     if not history.records or history.manifest.service_nights == 0:
         raise ValueError("source bundle produced no service-night history")
 

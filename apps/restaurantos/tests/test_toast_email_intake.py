@@ -10,20 +10,21 @@ from restaurantos.toast_email_intake import (
 )
 
 
-def _zip(*, sales="38263.87", guests="524", day="20261105", mismatch=False):
+# Figures in this file are invented. Real operating figures are private and
+# never belong in the repository.
+def _zip(*, sales="1000.00", guests="40", day="20261105", mismatch=False):
     files = {
-        "Revenue summary.csv": "Net sales\n38263.87\n",
+        "Revenue summary.csv": "Net sales\n1000.00\n",
         "Net sales summary.csv": (
             "Gross sales,Sales discounts,Sales refunds,Net sales\n"
-            f"38878.27,-614.40,0.00,{sales}\n"
+            f"1050.00,-50.00,0.00,{sales}\n"
         ),
         "Sales by day.csv": (
-            "yyyyMMdd,Net sales,Total orders,Total guests\n"
-            f"{day},38263.87,150,{guests}\n"
+            f"yyyyMMdd,Net sales,Total orders,Total guests\n{day},1000.00,12,{guests}\n"
         ),
         "Service mode summary.csv": (
             "Service mode,Net sales,Total guests,Total orders\n"
-            f"Total,{38263.87 if not mismatch else 1},524,150\n"
+            f"Total,{1000.00 if not mismatch else 1},40,12\n"
         ),
     }
     output = io.BytesIO()
@@ -33,12 +34,12 @@ def _zip(*, sales="38263.87", guests="524", day="20261105", mismatch=False):
     return output.getvalue()
 
 
-def test_november_5_reconciles():
+def test_one_day_summary_reconciles():
     summary = preview_sales_summary("SalesSummary_2026-11-05_2026-11-05.zip", _zip())
     assert summary.service_date == "2026-11-05"
-    assert summary.net_sales == 38263.87
-    assert summary.guests == 524
-    assert summary.orders == 150
+    assert summary.net_sales == 1000.00
+    assert summary.guests == 40
+    assert summary.orders == 12
     assert len(summary.source_sha256) == 64
 
 
