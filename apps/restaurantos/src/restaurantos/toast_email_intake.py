@@ -32,6 +32,8 @@ class ToastSalesPreview:
     guests: int
     orders: int
     source_sha256: str
+    sales_discounts: float = 0.0
+    void_amount: float | None = None
 
 
 def _csv_rows(archive: zipfile.ZipFile, name: str) -> list[dict[str, str]]:
@@ -112,8 +114,22 @@ def preview_sales_summary(filename: str, data: bytes) -> ToastSalesPreview:
             mode_totals[0]["Total orders"]
         ):
             raise ValueError("conflicting Toast guest or order totals")
+        void_amount: float | None = None
+        if "Void summary.csv" in names:
+            void_rows = _csv_rows(archive, "Void summary.csv")
+            if len(void_rows) != 1:
+                raise ValueError("expected one void summary row")
+            void_amount = float(void_rows[0]["Void amount"])
+            if not math.isfinite(void_amount) or void_amount < 0:
+                raise ValueError("unexpected void amount")
         return ToastSalesPreview(
-            match.group(1), sales, guests, orders, hashlib.sha256(data).hexdigest()
+            match.group(1),
+            sales,
+            guests,
+            orders,
+            hashlib.sha256(data).hexdigest(),
+            sales_discounts=discounts,
+            void_amount=void_amount,
         )
 
 

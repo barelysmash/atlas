@@ -12,6 +12,7 @@ from restaurantos.operating_brief_runner import (
     operating_brief_from_history,
     write_operating_brief,
 )
+from restaurantos.toast_import_apply import approve_staged_import
 
 
 def _iso_date(value: str) -> date:
@@ -94,6 +95,7 @@ def main() -> None:
     refresh_parser.add_argument("--manifest", required=True)
     refresh_parser.add_argument("--restaurant", required=True)
     refresh_parser.add_argument("--overrides")
+    refresh_parser.add_argument("--approved-imports")
     _add_brief_arguments(refresh_parser)
 
     gmail_parser = subparsers.add_parser("gmail-nightly-refresh")
@@ -106,7 +108,18 @@ def main() -> None:
     gmail_parser.add_argument("--query", default=DEFAULT_GMAIL_NIGHTLY_QUERY)
     gmail_parser.add_argument("--lookback-days", type=int, default=2)
     gmail_parser.add_argument("--overrides")
+    gmail_parser.add_argument("--approved-imports")
     _add_brief_arguments(gmail_parser)
+
+    approve_parser = subparsers.add_parser(
+        "toast-approve",
+        help="approve one staged Toast night so the next rebuild adds it",
+    )
+    approve_parser.add_argument("--review-dir", required=True)
+    approve_parser.add_argument("--approved-dir", required=True)
+    approve_parser.add_argument("--service-date", required=True, type=_iso_date)
+    approve_parser.add_argument("--sha256")
+    approve_parser.add_argument("--replace", action="store_true")
 
     serve_parser = subparsers.add_parser(
         "serve",
@@ -133,6 +146,24 @@ def main() -> None:
         serve(config)
         return
 
+    if args.command == "toast-approve":
+        try:
+            night = approve_staged_import(
+                args.review_dir,
+                args.approved_dir,
+                args.service_date,
+                sha256=args.sha256,
+                replace=args.replace,
+            )
+        except ValueError as error:
+            parser.error(str(error))
+        # Date and hash only: figures stay in the private approval file.
+        print(f"approved_service_date={night.service_date.isoformat()}")
+        print(f"sha256={night.sha256}")
+        print("applies=net_sales,voids")
+        print("next=run the nightly refresh to rebuild the ledger")
+        return
+
     if args.command == "morning-brief":
         print(morning_brief(args.input, args.restaurant))
         return
@@ -145,6 +176,7 @@ def main() -> None:
             args.manifest,
             restaurant=args.restaurant,
             overrides_path=args.overrides,
+            approved_imports_path=args.approved_imports,
             brief_path=args.brief_output,
             brief_window=brief_window,
             compare_window=compare_window,
@@ -170,6 +202,7 @@ def main() -> None:
             query=args.query,
             lookback_days=args.lookback_days,
             overrides_path=args.overrides,
+            approved_imports_path=args.approved_imports,
             brief_path=args.brief_output,
             brief_window=brief_window,
             compare_window=compare_window,
