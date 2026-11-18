@@ -15,6 +15,7 @@ Routes
     GET  /health                 liveness, no auth, no data
     GET  /v1/freshness           how current the ledger is
     POST /v1/operating-summary   relative comparison of two periods
+    GET  /v1/decisions           Decisions against the venue's goals, relative
 """
 
 from __future__ import annotations
@@ -35,6 +36,11 @@ from zoneinfo import ZoneInfo
 
 from atlas_core.operational_record import OperationalRecord
 
+from restaurantos.decisions import (
+    DECISIONS_FILENAME,
+    read_decisions_file,
+    relative_decisions,
+)
 from restaurantos.nightly_history import read_history_jsonl
 from restaurantos.nightly_schedule import aligned_month_windows
 from restaurantos.operating_brief import summarize_operating_period
@@ -513,6 +519,13 @@ class _Handler(BaseHTTPRequestHandler):
             if path == "/v1/freshness" and method == "GET":
                 data = freshness(
                     self.ledger, self.config.manifest_path, today=self._today()
+                )
+            elif path == "/v1/decisions" and method == "GET":
+                data = relative_decisions(
+                    read_decisions_file(
+                        self.config.history_path.parent / DECISIONS_FILENAME
+                    ),
+                    today=self._today(),
                 )
             elif path == "/v1/operating-summary" and method == "POST":
                 data = operating_summary(

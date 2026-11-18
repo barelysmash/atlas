@@ -35,6 +35,7 @@ def main() -> int:
     brief = restaurant_root / "operating-brief.md"
     overrides = restaurant_root / "service-date-overrides.json"
     approved_imports = restaurant_root / "toast-approved"
+    goals = restaurant_root / "goals.json"
 
     _required_file(credentials, "Gmail OAuth credentials")
     _required_file(messages, "private nightly message bundle")
@@ -82,6 +83,8 @@ def main() -> int:
         command.extend(("--overrides", str(overrides)))
     if approved_imports.is_dir():
         command.extend(("--approved-imports", str(approved_imports)))
+    if goals.is_file():
+        command.extend(("--goals", str(goals)))
 
     print(f"scheduled_service_end={service_end.isoformat()}")
     print(
