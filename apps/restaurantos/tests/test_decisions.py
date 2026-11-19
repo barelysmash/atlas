@@ -376,6 +376,43 @@ def test_the_projection_says_what_moved_and_by_how_much(tmp_path: Path):
     assert any("the week of 2026-06-01" in r for r in sales["recommendations"])
 
 
+def test_each_citation_names_the_weeks_it_compares(tmp_path: Path):
+    sales = next(
+        d for d in projection(tmp_path)["decisions"] if d["metric"] == "net sales"
+    )
+    latest, streak = sales["evidence"]
+    assert latest["week_of"] == "2026-07-13"
+    assert latest["compared_with_week_of"] == "2026-07-06"
+    assert latest["weeks_skipped_between"] == 0
+    assert streak["compared_with_week_of"] == "2026-06-01"
+
+
+def test_a_comparison_across_a_skipped_week_is_not_called_the_week_before(
+    tmp_path: Path,
+):
+    # A sales-only night in the second-to-last week: that week is left out
+    # for labor metrics, so the latest week is compared with the one before it.
+    partial = {MONDAY + timedelta(days=37)}
+    path = tmp_path / DECISIONS_FILENAME
+    write_decisions_file(ledger(sales_only=partial), GOALS, path, now=NOW)
+    shown = relative_decisions(read_decisions_file(path), today=date(2026, 7, 23))
+    found = {d["metric"]: d["evidence"][0] for d in shown["decisions"]}
+
+    sales = found["net sales"]
+    assert sales["basis"] == "latest full week against the week before"
+    assert sales["compared_with_week_of"] == "2026-07-06"
+
+    for metric in ("sales per labor hour", "labor cost percent", "covers"):
+        item = found[metric]
+        assert item["week_of"] == "2026-07-13"
+        assert item["compared_with_week_of"] == "2026-06-29"
+        assert item["weeks_skipped_between"] == 1
+        assert item["basis"] == (
+            "latest full week against an earlier week, not the week before"
+        )
+    assert "weeks_skipped_between" in " ".join(shown["notes"])
+
+
 def test_high_priority_and_newest_come_first(tmp_path: Path):
     path = tmp_path / DECISIONS_FILENAME
     write_decisions_file(ledger(sales_step=500.0), GOALS, path, now=NOW)

@@ -62,6 +62,11 @@ A malformed goals file is reported in the refresh output as
 5. A movement outside the tolerance, against or with the goal, becomes a
    Decision. Every Decision requires approval; none is executed.
 
+When a week is dropped for a metric, the comparison reaches back to the
+week before it. So metrics in one run can rest on different pairs of weeks,
+and their changes cannot be combined. The peer API names the weeks on every
+citation (`week_of`, `compared_with_week_of`, `weeks_skipped_between`).
+
 A week-over-week comparison does not know about holidays, weather or events.
 A Decision says a metric moved against or with a goal. It does not say why.
 
