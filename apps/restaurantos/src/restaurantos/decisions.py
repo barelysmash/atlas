@@ -25,6 +25,7 @@ import json
 import re
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -318,8 +319,27 @@ def _blocks_cited(item: dict[str, Any]) -> int:
     return len(_PERIOD.findall(source_ref)) if isinstance(source_ref, str) else 0
 
 
+def _week_starts(item: dict[str, Any]) -> list[date]:
+    """The Monday of each weekly block a citation rests on, oldest first."""
+    source_ref = item.get("source_ref")
+    if not isinstance(source_ref, str):
+        return []
+    starts: set[date] = set()
+    for period in _PERIOD.findall(source_ref):
+        first = date.fromisoformat(period[:10])
+        starts.add(first - timedelta(days=first.weekday()))
+    return sorted(starts)
+
+
 def _relative_evidence(document: dict[str, Any]) -> list[dict[str, Any]]:
-    """Direction and percent change per citation. Never a value or statement."""
+    """Direction and percent change per citation. Never a value or statement.
+
+    Each citation names the weeks it compares. They are not always
+    neighbours: a week with a missing night is left out for the metrics that
+    night lacks, and the comparison then reaches back to the week before it.
+    Saying "the week before" for such a comparison would be wrong, and two
+    metrics in one answer can rest on different pairs of weeks.
+    """
     evidence: list[dict[str, Any]] = []
     for item in document.get("evidence", []):
         metric = item.get("metric") if isinstance(item, dict) else None
@@ -328,17 +348,31 @@ def _relative_evidence(document: dict[str, Any]) -> list[dict[str, Any]]:
         delta = metric.get("delta")
         if isinstance(delta, bool) or not isinstance(delta, int | float):
             continue
-        blocks = _blocks_cited(item)
+        weeks = _week_starts(item)
+        skipped = sum(
+            (later - earlier).days // 7 - 1 for earlier, later in pairwise(weeks)
+        )
+        if len(weeks) <= 2:
+            basis = (
+                "latest full week against the week before"
+                if skipped == 0
+                else "latest full week against an earlier week, not the week before"
+            )
+        else:
+            basis = f"across {len(weeks) - 1} consecutive weekly moves the same way"
+            if skipped:
+                basis += ", with skipped weeks between"
         evidence.append(
             {
                 "metric": metric_label(str(metric.get("name", ""))),
                 "direction": "up" if delta > 0 else "down" if delta < 0 else "flat",
                 "change_pct": round(float(delta) * 100, 1),
-                "basis": (
-                    "latest full week against the week before"
-                    if blocks <= 2
-                    else f"across {blocks - 1} consecutive weekly moves the same way"
+                "basis": basis,
+                "week_of": weeks[-1].isoformat() if weeks else None,
+                "compared_with_week_of": (
+                    weeks[0].isoformat() if len(weeks) >= 2 else None
                 ),
+                "weeks_skipped_between": skipped,
             }
         )
     return evidence
@@ -426,6 +460,11 @@ def relative_decisions(
             "Each Decision compares whole calendar weeks. A week with fewer "
             "reported nights than usual is left out, so the current week and "
             "a week with a missing night are not judged.",
+            "Each evidence item names its own weeks (week_of and "
+            "compared_with_week_of). They can differ between metrics, and "
+            "when weeks_skipped_between is above zero the comparison is not "
+            "with the week before: state the weeks, and do not combine "
+            "changes that rest on different pairs of weeks.",
             "change_pct is the relative change in the metric itself. For a "
             "metric that is already a percent, it is not a change in points.",
             "A week-over-week move does not account for holidays, weather or "
