@@ -6,6 +6,11 @@ from pathlib import Path
 
 from atlas_core.operational_record import OperationalRecord
 
+from restaurantos.decisions import (
+    DECISIONS_FILENAME,
+    load_goals,
+    write_decisions_file,
+)
 from restaurantos.nightly_backfill import NightlyEmailMessage, backfill_nightly_emails
 from restaurantos.nightly_history import (
     build_nightly_history,
@@ -49,6 +54,8 @@ class NightlyRefreshResult:
     history_path: Path
     manifest_path: Path
     brief_path: Path | None = None
+    decision_count: int | None = None
+    decision_error: str | None = None
 
 
 def _parse_sent_at(value: object, line_number: int) -> datetime:
@@ -210,6 +217,7 @@ def rebuild_nightly_history(
     restaurant: str,
     overrides_path: str | Path | None = None,
     approved_imports_path: str | Path | None = None,
+    goals_path: str | Path | None = None,
     brief_path: str | Path | None = None,
     brief_window: NightlyBriefWindow | None = None,
     compare_window: NightlyBriefWindow | None = None,
@@ -218,6 +226,10 @@ def rebuild_nightly_history(
 
     ``approved_imports_path`` is the private folder of approved Toast nights.
     Each fills a night with no readable nightly email, as a partial night.
+
+    ``goals_path`` is the venue's private goals file. When given, Decisions
+    are reasoned from the rebuilt ledger and written beside it. A problem
+    there is reported in the result and never blocks the ledger itself.
     """
     if not restaurant.strip():
         raise ValueError("restaurant is required")
@@ -272,6 +284,18 @@ def rebuild_nightly_history(
     if brief_destination is not None and brief is not None:
         write_operating_brief(brief_destination, brief)
 
+    decision_count: int | None = None
+    decision_error: str | None = None
+    if goals_path is not None:
+        try:
+            decision_count = write_decisions_file(
+                list(history.records),
+                load_goals(goals_path),
+                history_destination.parent / DECISIONS_FILENAME,
+            )
+        except (OSError, ValueError) as error:
+            decision_error = str(error)
+
     manifest = history.manifest
     return NightlyRefreshResult(
         message_count=len(messages),
@@ -284,4 +308,6 @@ def rebuild_nightly_history(
         history_path=history_destination,
         manifest_path=manifest_destination,
         brief_path=brief_destination,
+        decision_count=decision_count,
+        decision_error=decision_error,
     )

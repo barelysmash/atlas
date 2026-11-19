@@ -7,7 +7,11 @@ from restaurantos.gmail_nightly_refresh import (
     DEFAULT_GMAIL_NIGHTLY_QUERY,
     gmail_nightly_refresh,
 )
-from restaurantos.nightly_refresh import NightlyBriefWindow, rebuild_nightly_history
+from restaurantos.nightly_refresh import (
+    NightlyBriefWindow,
+    NightlyRefreshResult,
+    rebuild_nightly_history,
+)
 from restaurantos.operating_brief_runner import (
     operating_brief_from_history,
     write_operating_brief,
@@ -70,6 +74,14 @@ def _brief_windows(
     return brief_window, compare_window
 
 
+def _print_decisions(result: NightlyRefreshResult) -> None:
+    """Counts only. A goals problem is reported; it never fails the refresh."""
+    if result.decision_count is not None:
+        print(f"decisions={result.decision_count}")
+    if result.decision_error is not None:
+        print(f"decisions_error={result.decision_error}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="restaurantos")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -96,6 +108,7 @@ def main() -> None:
     refresh_parser.add_argument("--restaurant", required=True)
     refresh_parser.add_argument("--overrides")
     refresh_parser.add_argument("--approved-imports")
+    refresh_parser.add_argument("--goals")
     _add_brief_arguments(refresh_parser)
 
     gmail_parser = subparsers.add_parser("gmail-nightly-refresh")
@@ -109,6 +122,7 @@ def main() -> None:
     gmail_parser.add_argument("--lookback-days", type=int, default=2)
     gmail_parser.add_argument("--overrides")
     gmail_parser.add_argument("--approved-imports")
+    gmail_parser.add_argument("--goals")
     _add_brief_arguments(gmail_parser)
 
     approve_parser = subparsers.add_parser(
@@ -177,6 +191,7 @@ def main() -> None:
             restaurant=args.restaurant,
             overrides_path=args.overrides,
             approved_imports_path=args.approved_imports,
+            goals_path=args.goals,
             brief_path=args.brief_output,
             brief_window=brief_window,
             compare_window=compare_window,
@@ -186,6 +201,7 @@ def main() -> None:
         print(f"reviews={refresh_result.review_count}")
         print(f"history={refresh_result.history_path}")
         print(f"manifest={refresh_result.manifest_path}")
+        _print_decisions(refresh_result)
         if refresh_result.brief_path is not None:
             print(f"brief={refresh_result.brief_path}")
         return
@@ -203,6 +219,7 @@ def main() -> None:
             lookback_days=args.lookback_days,
             overrides_path=args.overrides,
             approved_imports_path=args.approved_imports,
+            goals_path=args.goals,
             brief_path=args.brief_output,
             brief_window=brief_window,
             compare_window=compare_window,
@@ -218,6 +235,7 @@ def main() -> None:
         print(f"state={gmail_result.sync.state_path}")
         print(f"history={gmail_result.refresh.history_path}")
         print(f"manifest={gmail_result.refresh.manifest_path}")
+        _print_decisions(gmail_result.refresh)
         if gmail_result.refresh.brief_path is not None:
             print(f"brief={gmail_result.refresh.brief_path}")
         return
