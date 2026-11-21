@@ -229,7 +229,7 @@ def render_briefing(
     night: date,
     nights: set[date],
     reviews: dict[date, tuple[str, ...]] | None,
-    partial: AbstractSet[date] | None = frozenset(),
+    partial: AbstractSet[date] | None,
 ) -> dict[str, Any]:
     """The content of one night's briefing (no id or timestamps).
 
@@ -245,7 +245,7 @@ def render_briefing(
         if week_night in nights
         else None
     )
-    # The compared nights that carry net sales and voids only (SPEC 4.3, U4).
+    # The compared nights that carry net sales and voids only.
     week_partial = [
         candidate
         for candidate in (night, week_night)
@@ -628,9 +628,7 @@ def refresh_briefings(
     if stat.S_ISDIR(mode):
         raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), str(history))
     if not stat.S_ISREG(mode):
-        raise OSError(
-            errno.EINVAL, "the nightly ledger is not a regular file", str(history)
-        )
+        raise OSError(f"the nightly ledger is not a regular file: '{history}'")
     # Race: the ledger can still be deleted or replaced between this check and
     # the read under the lock. The refresh then fails on that read (non-zero
     # exit, nothing written) after creating only the lock file and directory.

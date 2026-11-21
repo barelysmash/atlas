@@ -535,7 +535,7 @@ def test_invalid_cursor(shared: Client, value: str):
 
 @needs_flock
 def test_well_formed_cursor_is_accepted_structurally(shared: Client):
-    """SPEC A10: no signature; a forged cursor only re-reads readable data."""
+    """No signature: a forged cursor only re-reads readable data."""
     listing = shared.get("/v1/briefings?limit=100")
     full = listing["items"]
     # Hand-built cursors must carry the served file's generation.
