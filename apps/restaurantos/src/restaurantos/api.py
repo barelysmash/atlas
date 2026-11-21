@@ -4,10 +4,12 @@ A small read-only HTTP service over the private nightly ledger, registered in
 JARVIS's agent registry per JAM ``standards/agent-registration.md``:
 
 * binds to loopback by default;
-* every data route requires ``Authorization: Bearer $ATLAS_API_TOKEN``;
+* every data route requires ``Authorization: Bearer $ATLAS_API_TOKEN``; the
+  briefing routes also accept the phone's ``$ATLAS_BRIEFINGS_TOKEN``, which
+  opens nothing else;
 * returns relative figures only (``relative_summary``), so no absolute dollar
   or cover figure leaves the host through this service;
-* never writes: the nightly workload owns the ledger.
+* never writes: the nightly workload owns the ledger and the briefings file.
 
 Standard library only, so the release venv gains no dependency.
 
@@ -16,6 +18,9 @@ Routes
     GET  /v1/freshness           how current the ledger is
     POST /v1/operating-summary   relative comparison of two periods
     GET  /v1/decisions           Decisions against the venue's goals, relative
+    GET  /v1/health              authenticated check for the phone app
+    GET  /v1/briefings           change feed of nightly briefings
+    GET  /v1/briefings/{id}      one briefing
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from http import HTTPStatus
@@ -36,11 +42,26 @@ from zoneinfo import ZoneInfo
 
 from atlas_core.operational_record import OperationalRecord
 
+from restaurantos.api_defaults import DEFAULT_HOST as DEFAULT_HOST  # re-exported
+from restaurantos.api_defaults import DEFAULT_PORT as DEFAULT_PORT  # re-exported
+from restaurantos.briefings_feed import (
+    BriefingsStore,
+    briefing_id_from_path,
+    list_page,
+    parse_list_query,
+    single_briefing,
+)
+from restaurantos.coverage import count_flagged_nights, count_partial_nights
+from restaurantos.coverage import (
+    read_partial_nights as read_partial_nights,  # re-exported
+)
+from restaurantos.coverage import read_reviews as read_reviews  # re-exported
 from restaurantos.decisions import (
     DECISIONS_FILENAME,
     read_decisions_file,
     relative_decisions,
 )
+from restaurantos.http_errors import ApiError as ApiError  # re-exported
 from restaurantos.nightly_history import read_history_jsonl
 from restaurantos.nightly_schedule import aligned_month_windows
 from restaurantos.operating_brief import summarize_operating_period
@@ -53,9 +74,9 @@ from restaurantos.relative_summary import (
 logger = logging.getLogger("restaurantos.api")
 
 SERVICE_NAME = "atlas-restaurantos"
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8790
 DEFAULT_TIMEZONE = "America/Chicago"
+DEFAULT_BRIEFINGS_NAME = "briefings.json"
+API_VERSION = "1"
 MIN_TOKEN_LENGTH = 24
 MAX_BODY_BYTES = 16 * 1024
 MAX_WINDOW_DAYS = 366
@@ -82,16 +103,6 @@ _MANIFEST_KEYS = (
 )
 
 
-class ApiError(Exception):
-    """A request the service refuses, with the status and code to report."""
-
-    def __init__(self, status: HTTPStatus, code: str, message: str) -> None:
-        super().__init__(message)
-        self.status = status
-        self.code = code
-        self.message = message
-
-
 @dataclass(frozen=True, slots=True)
 class ApiConfig:
     history_path: Path
@@ -100,12 +111,35 @@ class ApiConfig:
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
     timezone: str = DEFAULT_TIMEZONE
+    # The briefings file the nightly workload writes; default next to the ledger.
+    briefings_path: Path | None = None
+    # The phone's token, accepted on the briefing routes only. None: unset.
+    briefings_token: str | None = None
 
     def __post_init__(self) -> None:
         if len(self.token) < MIN_TOKEN_LENGTH:
             raise ValueError(
                 f"ATLAS_API_TOKEN must be at least {MIN_TOKEN_LENGTH} characters"
             )
+        if self.briefings_token is not None:
+            # Messages name the variable, never its value.
+            if len(self.briefings_token) < MIN_TOKEN_LENGTH:
+                raise ValueError(
+                    "ATLAS_BRIEFINGS_TOKEN must be at least "
+                    f"{MIN_TOKEN_LENGTH} characters"
+                )
+            if hmac.compare_digest(
+                self.briefings_token.encode("utf-8"), self.token.encode("utf-8")
+            ):
+                raise ValueError(
+                    "ATLAS_BRIEFINGS_TOKEN must differ from ATLAS_API_TOKEN"
+                )
+
+    @property
+    def resolved_briefings_path(self) -> Path:
+        if self.briefings_path is not None:
+            return self.briefings_path
+        return self.history_path.parent / DEFAULT_BRIEFINGS_NAME
 
 
 def config_from_env(
@@ -114,8 +148,12 @@ def config_from_env(
     *,
     host: str | None = None,
     port: int | None = None,
+    briefings_path: str | Path | None = None,
 ) -> ApiConfig:
-    """Build the service config; the token comes from the environment only."""
+    """Build the service config; tokens come from the environment only.
+
+    An empty ``ATLAS_BRIEFINGS_TOKEN`` (as in the env template) means unset.
+    """
     return ApiConfig(
         history_path=Path(history_path).expanduser(),
         manifest_path=Path(manifest_path).expanduser(),
@@ -125,6 +163,10 @@ def config_from_env(
         if port is not None
         else int(os.environ.get("ATLAS_API_PORT", str(DEFAULT_PORT))),
         timezone=os.environ.get("ATLAS_TIMEZONE", DEFAULT_TIMEZONE),
+        briefings_path=Path(briefings_path).expanduser()
+        if briefings_path is not None
+        else None,
+        briefings_token=os.environ.get("ATLAS_BRIEFINGS_TOKEN") or None,
     )
 
 
@@ -160,7 +202,7 @@ class Ledger:
             return None
 
 
-def _service_dates(records: list[OperationalRecord]) -> list[date]:
+def _service_dates(records: Iterable[OperationalRecord]) -> list[date]:
     dates: set[date] = set()
     for record in records:
         try:
@@ -214,64 +256,6 @@ def _pair(
     return start, end
 
 
-def read_reviews(manifest_path: Path) -> dict[date, tuple[str, ...]] | None:
-    """Nights in review, by service date, from the manifest.
-
-    None means unknown: no manifest yet, or one written before reviews were
-    recorded by night. An empty dict means the manifest lists none.
-    """
-    try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    entries = raw.get("reviews") if isinstance(raw, dict) else None
-    if not isinstance(entries, list):
-        return None
-    reviews: dict[date, tuple[str, ...]] = {}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        try:
-            night = date.fromisoformat(str(entry.get("service_date")))
-        except ValueError:
-            continue
-        reasons = entry.get("reasons")
-        reviews[night] = tuple(
-            str(reason) for reason in (reasons if isinstance(reasons, list) else [])
-        )
-    return reviews
-
-
-def read_partial_nights(manifest_path: Path) -> set[date] | None:
-    """Nights filled from an approved Toast summary: net sales and voids only.
-
-    None means unknown: no manifest, or one written before partial nights
-    were recorded.
-    """
-    try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    entries = raw.get("partial_nights") if isinstance(raw, dict) else None
-    if not isinstance(entries, list):
-        return None
-    nights: set[date] = set()
-    for entry in entries:
-        try:
-            nights.add(date.fromisoformat(str(entry)))
-        except ValueError:
-            continue
-    return nights
-
-
-def _partial_count(period: dict[str, Any], partial: set[date] | None) -> int | None:
-    if partial is None:
-        return None
-    start = date.fromisoformat(period["start_date"])
-    end = date.fromisoformat(period["end_date"])
-    return sum(1 for night in partial if start <= night <= end)
-
-
 def _coverage(
     period: dict[str, Any],
     records: list[OperationalRecord],
@@ -284,36 +268,20 @@ def _coverage(
     report arrived but could not be read). ``nights_in_review`` are nights in
     the ledger with something flagged, usually one missing field.
     """
-    if reviews is None:
+    start = date.fromisoformat(period["start_date"])
+    end = date.fromisoformat(period["end_date"])
+    nights = set(_service_dates(r for r in records if r.entity == entity))
+    counts = count_flagged_nights(reviews, nights, start, end)
+    if counts is None:
         return {
             "nights_in_review": None,
             "nights_missing": None,
             "review_reasons": None,
         }
-    start = date.fromisoformat(period["start_date"])
-    end = date.fromisoformat(period["end_date"])
-    in_ledger = {
-        record.period
-        for record in records
-        if record.entity == entity
-        and start.isoformat() <= record.period <= end.isoformat()
-    }
-    in_review = 0
-    missing = 0
-    reasons: dict[str, int] = {}
-    for night, night_reasons in reviews.items():
-        if not start <= night <= end:
-            continue
-        if night.isoformat() in in_ledger:
-            in_review += 1
-        else:
-            missing += 1
-        for reason in night_reasons:
-            reasons[reason] = reasons.get(reason, 0) + 1
     return {
-        "nights_in_review": in_review,
-        "nights_missing": missing,
-        "review_reasons": dict(sorted(reasons.items())),
+        "nights_in_review": counts.in_review,
+        "nights_missing": counts.missing,
+        "review_reasons": counts.reasons,
     }
 
 
@@ -398,7 +366,11 @@ def operating_summary(
     summary = relative_operating_summary(current, previous)
     for name in ("current", "previous"):
         summary[name].update(_coverage(summary[name], records, current.entity, reviews))
-        summary[name]["nights_partial"] = _partial_count(summary[name], partial_nights)
+        summary[name]["nights_partial"] = count_partial_nights(
+            partial_nights,
+            date.fromisoformat(summary[name]["start_date"]),
+            date.fromisoformat(summary[name]["end_date"]),
+        )
     summary["notes"].append(
         "nights_missing counts nights whose report arrived but could not be "
         "read, so they are absent from the comparison. nights_in_review "
@@ -446,26 +418,44 @@ class _Handler(BaseHTTPRequestHandler):
     # Set per server by make_server().
     config: ApiConfig
     ledger: Ledger
+    briefings: BriefingsStore
 
     def log_message(self, format: str, *args: Any) -> None:
         # Request line and status only; never a body, never the token.
         logger.info("%s %s", self.address_string(), format % args)
 
-    def _send(self, status: HTTPStatus, body: dict[str, Any]) -> None:
+    def _send(
+        self,
+        status: HTTPStatus,
+        body: dict[str, Any],
+        headers: dict[str, str] | None = None,
+    ) -> None:
         encoded = json.dumps(body, sort_keys=True).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(encoded)
 
-    def _authorized(self) -> bool:
+    def _authorized(self, *, briefing_route: bool = False) -> bool:
+        """The service token opens every route; the phone token only briefings.
+
+        Both comparisons run in constant time, and both always run on a
+        briefing route, so timing does not tell which token matched.
+        """
         header = self.headers.get("Authorization", "")
         scheme, _, presented = header.partition(" ")
-        return scheme.lower() == "bearer" and hmac.compare_digest(
-            presented.strip().encode("utf-8"), self.config.token.encode("utf-8")
-        )
+        if scheme.lower() != "bearer":
+            return False
+        offered = presented.strip().encode("utf-8")
+        allowed = hmac.compare_digest(offered, self.config.token.encode("utf-8"))
+        phone = self.config.briefings_token
+        if briefing_route and phone is not None:
+            allowed = hmac.compare_digest(offered, phone.encode("utf-8")) | allowed
+        return allowed
 
     def _body(self) -> dict[str, Any]:
         try:
@@ -498,9 +488,33 @@ class _Handler(BaseHTTPRequestHandler):
     def _today(self) -> date:
         return datetime.now(ZoneInfo(self.config.timezone)).date()
 
+    def _briefing_route(self, method: str, path: str, query: str) -> dict[str, Any]:
+        """GET /v1/health, /v1/briefings and /v1/briefings/{id}."""
+        if method != "GET":
+            self.close_connection = True
+            raise ApiError(
+                HTTPStatus.METHOD_NOT_ALLOWED,
+                "method_not_allowed",
+                "Only GET is allowed on this route.",
+                headers={"Allow": "GET"},
+            )
+        if path == "/v1/health":
+            return {
+                "api_version": API_VERSION,
+                "figures": FIGURES_POLICY,
+                "name": SERVICE_NAME,
+                "ok": True,
+            }
+        if path == "/v1/briefings":
+            listing = parse_list_query(query)
+            return list_page(self.briefings.snapshot(), listing)
+        ident = briefing_id_from_path(path.removeprefix("/v1/briefings/"))
+        return single_briefing(self.briefings.snapshot(), ident)
+
     def _dispatch(self, method: str) -> None:
         request_id = uuid4().hex
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
+        raw_path, _, query = self.path.partition("?")
+        path = raw_path.rstrip("/") or "/"
         try:
             if path == "/health" and method == "GET":
                 self._send(
@@ -508,7 +522,8 @@ class _Handler(BaseHTTPRequestHandler):
                     {"status": "ok", "service": SERVICE_NAME},
                 )
                 return
-            if not self._authorized():
+            briefing_route = _is_briefing_route(path)
+            if not self._authorized(briefing_route=briefing_route):
                 # Drain nothing and say nothing about which routes exist.
                 self.close_connection = True
                 raise ApiError(
@@ -516,7 +531,9 @@ class _Handler(BaseHTTPRequestHandler):
                     "unauthorized",
                     "A valid bearer token is required.",
                 )
-            if path == "/v1/freshness" and method == "GET":
+            if briefing_route:
+                data = self._briefing_route(method, path, query)
+            elif path == "/v1/freshness" and method == "GET":
                 data = freshness(
                     self.ledger, self.config.manifest_path, today=self._today()
                 )
@@ -544,6 +561,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "request_id": request_id,
                     "error": {"code": error.code, "message": error.message},
                 },
+                error.headers,
             )
             return
         except Exception:
@@ -570,12 +588,24 @@ class _Handler(BaseHTTPRequestHandler):
         self._dispatch("POST")
 
 
+def _is_briefing_route(path: str) -> bool:
+    """The routes the phone token may open (matched before any decoding)."""
+    if path in ("/v1/health", "/v1/briefings"):
+        return True
+    segment = path.removeprefix("/v1/briefings/")
+    return segment != path and segment != "" and "/" not in segment
+
+
 def make_server(config: ApiConfig) -> ThreadingHTTPServer:
     """Build the server (not yet serving). Port 0 picks a free port."""
     handler = type(
         "RestaurantOSHandler",
         (_Handler,),
-        {"config": config, "ledger": Ledger(config.history_path)},
+        {
+            "config": config,
+            "ledger": Ledger(config.history_path),
+            "briefings": BriefingsStore(config.resolved_briefings_path),
+        },
     )
     server = ThreadingHTTPServer((config.host, config.port), handler)
     server.daemon_threads = True
