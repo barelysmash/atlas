@@ -1,7 +1,13 @@
 import argparse
+import sys
 from datetime import date
 
-from restaurantos.api import DEFAULT_HOST, DEFAULT_PORT, config_from_env, serve
+# restaurantos.api (and with it http.server) is imported only by `serve`, so
+# the nightly commands never load the server; the defaults live apart from it.
+# Likewise restaurantos.briefings (which needs the POSIX-only fcntl to write)
+# is imported only by `briefings-refresh`, so every other command also runs
+# on a host without fcntl, such as a Windows development machine.
+from restaurantos.api_defaults import DEFAULT_HOST, DEFAULT_PORT
 from restaurantos.cli import morning_brief
 from restaurantos.gmail_nightly_refresh import (
     DEFAULT_GMAIL_NIGHTLY_QUERY,
@@ -125,6 +131,30 @@ def main() -> None:
     gmail_parser.add_argument("--goals")
     _add_brief_arguments(gmail_parser)
 
+    briefings_parser = subparsers.add_parser(
+        "briefings-refresh",
+        help="build or refresh the briefings file from the nightly ledger",
+        description=(
+            "Build one relative-only briefing per service night in the ledger. "
+            "Unchanged briefings keep their updated_at; nights that left the "
+            "ledger become tombstones."
+        ),
+    )
+    briefings_parser.add_argument(
+        "--history", required=True, help="the nightly ledger (JSON Lines)"
+    )
+    briefings_parser.add_argument(
+        "--manifest",
+        required=True,
+        help="the nightly manifest (nights in review); may not exist yet",
+    )
+    briefings_parser.add_argument(
+        "--briefings", required=True, help="the briefings file to write"
+    )
+    briefings_parser.add_argument(
+        "--entity", help="the entity to brief; required if the ledger has several"
+    )
+
     approve_parser = subparsers.add_parser(
         "toast-approve",
         help="approve one staged Toast night so the next rebuild adds it",
@@ -142,6 +172,11 @@ def main() -> None:
     serve_parser.add_argument("--history", required=True)
     serve_parser.add_argument("--manifest", required=True)
     serve_parser.add_argument(
+        "--briefings",
+        help="the briefings file to serve (read only); "
+        "default briefings.json next to --history",
+    )
+    serve_parser.add_argument(
         "--host", help=f"default ATLAS_API_HOST or {DEFAULT_HOST}"
     )
     serve_parser.add_argument(
@@ -151,13 +186,35 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "serve":
+        from restaurantos.api import config_from_env, serve
+
         try:
             config = config_from_env(
-                args.history, args.manifest, host=args.host, port=args.port
+                args.history,
+                args.manifest,
+                host=args.host,
+                port=args.port,
+                briefings_path=args.briefings,
             )
         except ValueError as error:
             parser.error(str(error))
         serve(config)
+        return
+
+    if args.command == "briefings-refresh":
+        from restaurantos.briefings import PosixHostRequiredError, refresh_briefings
+
+        try:
+            result = refresh_briefings(
+                args.history, args.manifest, args.briefings, entity=args.entity
+            )
+        except (OSError, ValueError, PosixHostRequiredError) as error:
+            print(f"restaurantos briefings-refresh: {error}", file=sys.stderr)
+            raise SystemExit(1) from None
+        print(f"briefings={result.briefings}")
+        print(f"changed={result.changed}")
+        print(f"tombstones={result.tombstones}")
+        print(f"path={result.path}")
         return
 
     if args.command == "toast-approve":
