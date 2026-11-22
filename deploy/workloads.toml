@@ -1,3 +1,5 @@
+# Refreshes the ledger from Gmail, then rebuilds the phone briefings file
+# restaurantos/fonda/briefings.json from it (relative figures only).
 [[workloads]]
 id = "restaurantos-nightly"
 data_dirs = [
@@ -15,7 +17,10 @@ autostart_services = []
 timers = ["atlas-restaurantos-nightly.timer"]
 
 # Read-only peer API JARVIS routes to (jarvis-v2 config/agents.yaml: atlas).
-# Blocked until the token file and the nightly ledger both exist.
+# Blocked until the token file and the nightly ledger both exist. It also
+# serves the phone briefings feed from restaurantos/fonda/briefings.json, read
+# only; that file is optional for readiness (the feed answers 503 until the
+# nightly run first writes it).
 [[workloads]]
 id = "restaurantos-api"
 data_dirs = [

@@ -11,11 +11,42 @@ from restaurantos.nightly_schedule import aligned_month_windows
 
 _DEFAULT_TIMEZONE = "America/Chicago"
 _DEFAULT_RESTAURANT = "Fonda San Miguel"
+# The briefings step waits for its refresh lock; a stuck holder must not hold
+# the nightly unit until systemd's start timeout fails it. Ten minutes leaves
+# room to wait behind a slow manual refresh that holds the lock.
+BRIEFINGS_TIMEOUT_SECONDS = 600
 
 
 def _required_file(path: Path, description: str) -> None:
     if not path.is_file() or path.stat().st_size == 0:
         raise RuntimeError(f"missing {description}: {path}")
+
+
+def _refresh_briefings(command: list[str]) -> None:
+    """Run the optional briefings step; report a failure on one stderr line.
+
+    By now the ledger refresh and operating brief have succeeded, so nothing
+    this step does (a non-zero exit, a missing interpreter, anything raised)
+    may mark the nightly unit as failed. The step is killed after
+    ``BRIEFINGS_TIMEOUT_SECONDS``, and a timeout is reported the same way.
+    """
+    try:
+        subprocess.run(command, check=True, timeout=BRIEFINGS_TIMEOUT_SECONDS)
+    except subprocess.CalledProcessError as error:
+        problem = f"exited with status {error.returncode}"
+    except subprocess.TimeoutExpired as error:
+        problem = f"timed out after {error.timeout:g} seconds"
+    except Exception as error:  # optional step: never fatal
+        problem = f"raised {type(error).__name__}: {error}"
+    else:
+        return
+    problem = " ".join(problem.split())
+    print(
+        f"restaurantos_nightly: the briefings-refresh step {problem}; the ledger "
+        "refresh succeeded, so the nightly run still succeeds (the phone feed "
+        "keeps its previous briefings until the next run)",
+        file=sys.stderr,
+    )
 
 
 def main() -> int:
@@ -36,6 +67,7 @@ def main() -> int:
     overrides = restaurant_root / "service-date-overrides.json"
     approved_imports = restaurant_root / "toast-approved"
     goals = restaurant_root / "goals.json"
+    briefings = restaurant_root / "briefings.json"
 
     _required_file(credentials, "Gmail OAuth credentials")
     _required_file(messages, "private nightly message bundle")
@@ -96,6 +128,27 @@ def main() -> int:
         f"{compare_window.start_date.isoformat()}..{compare_window.end_date.isoformat()}"
     )
     subprocess.run(command, check=True)
+
+    # The phone briefings feed: rebuilt from the refreshed ledger, relative
+    # figures only. Runs only after a successful refresh (check=True above);
+    # the peer API reads the file and never writes it. The feed is optional:
+    # its failure is reported, never allowed to fail the nightly unit.
+    _refresh_briefings(
+        [
+            sys.executable,
+            "-m",
+            "restaurantos",
+            "briefings-refresh",
+            "--history",
+            str(history),
+            "--manifest",
+            str(manifest),
+            "--briefings",
+            str(briefings),
+            "--entity",
+            restaurant,
+        ]
+    )
     return 0
 
 
